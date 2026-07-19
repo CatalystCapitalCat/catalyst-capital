@@ -1,0 +1,1450 @@
+<meta charset="utf-8">
+<title>星引模型 · Catalyst Capital</title>
+<style>
+  :root {
+    --bg: #FDF8F1;
+    --card: #ffffff;
+    --ink: #52483E;
+    --ink-2: #7D7061;
+    --muted: #A5988A;
+    --line: #F0E3D2;
+    --line-soft: #F7EEE1;
+    --quote-bg: #FBF4EA;
+    --bar: #BBD8F2;
+    --guru-a: #4A88C7;
+    --guru-b: #C0862D;
+    --guru-c: #8B76CC;
+    --bull: #3B8F5C;
+    --bull-wash: rgba(107, 190, 140, 0.16);
+    --bear: #D95A6A;
+    --bear-wash: rgba(240, 150, 165, 0.18);
+    --neut: #7D7061;
+    --neut-wash: rgba(150, 130, 110, 0.10);
+    --warn: #B07A2A;
+    --warn-wash: rgba(250, 190, 120, 0.22);
+    --live: #3B8F5C;
+    --live-wash: rgba(107, 190, 140, 0.16);
+    --pill-strong-bg: #52483E;
+    --pill-strong-ink: #ffffff;
+    color-scheme: light;
+  }
+  :root[data-theme="light"] {
+    --bg: #FDF8F1;
+    --card: #ffffff;
+    --ink: #52483E;
+    --ink-2: #7D7061;
+    --muted: #A5988A;
+    --line: #F0E3D2;
+    --line-soft: #F7EEE1;
+    --quote-bg: #FBF4EA;
+    --bar: #BBD8F2;
+    --guru-a: #4A88C7;
+    --guru-b: #C0862D;
+    --guru-c: #8B76CC;
+    --bull: #3B8F5C;
+    --bull-wash: rgba(107, 190, 140, 0.16);
+    --bear: #D95A6A;
+    --bear-wash: rgba(240, 150, 165, 0.18);
+    --neut: #7D7061;
+    --neut-wash: rgba(150, 130, 110, 0.10);
+    --warn: #B07A2A;
+    --warn-wash: rgba(250, 190, 120, 0.22);
+    --live: #3B8F5C;
+    --live-wash: rgba(107, 190, 140, 0.16);
+    --pill-strong-bg: #52483E;
+    --pill-strong-ink: #ffffff;
+    color-scheme: light;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
+  }
+  .mono {
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 0 20px 64px; }
+
+  .masthead { padding: 32px 0 0; }
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 6px;
+  }
+  .masthead-row { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .masthead h1 { font-size: 30px; font-weight: 800; letter-spacing: 0.02em; margin: 0; }
+  .masthead .en {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 13px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+  }
+  .live-badge {
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--live);
+    background: var(--live-wash);
+    border-radius: 4px;
+    padding: 2px 8px;
+    white-space: nowrap;
+  }
+  .meta-row {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .meta-row .dot-sep::before { content: "·"; margin-right: 16px; }
+
+  section { margin-top: 36px; }
+  .sec-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+  .sec-head h2 { font-size: 16px; font-weight: 700; margin: 0; }
+  .sec-head .sub { font-size: 12.5px; color: var(--muted); }
+
+  .tldr { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 6px 20px; }
+  .tldr-item { display: flex; gap: 12px; padding: 13px 0; border-bottom: 1px solid var(--line-soft); }
+  .tldr-item:last-child { border-bottom: none; }
+  .tldr-item .n {
+    flex: none;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    color: var(--muted);
+    padding-top: 3px;
+  }
+  .tldr-item > div { flex: 1; min-width: 0; }
+  .tldr-item p { margin: 0; font-size: 14.5px; }
+  .attr { font-size: 12px; color: var(--muted); white-space: normal; margin-left: 6px; }
+  .news-tag {
+    flex: none;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--ink-2);
+    background: var(--neut-wash);
+    border-radius: 4px;
+    padding: 3px 7px;
+    margin-top: 2px;
+    white-space: nowrap;
+  }
+  .tldr-item details { margin-top: 8px; }
+  .tldr-item summary {
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--guru-b);
+    list-style: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .tldr-item summary::-webkit-details-marker { display: none; }
+  .tldr-item summary::before { content: "▸"; font-size: 10px; }
+  .tldr-item details[open] summary::before { content: "▾"; }
+  .orig-quote {
+    margin: 8px 0 0;
+    padding: 10px 14px;
+    background: var(--quote-bg);
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--ink-2);
+    white-space: pre-line;
+  }
+  .orig-src { font-size: 12.5px; color: var(--ink-2); margin: 8px 0 0; line-height: 1.7; }
+  .orig-src a { color: var(--guru-a); }
+  .orig-src .diff { color: var(--warn); font-weight: 600; }
+  a.xref { color: var(--guru-a); font-weight: 650; text-decoration: none; }
+  a.xref:hover { text-decoration: underline; }
+  a.evt-link { color: var(--guru-a); text-decoration: none; }
+  a.evt-link:hover { text-decoration: underline; }
+  section, .tech-chart, .tldr-item[id] { scroll-margin-top: 16px; }
+
+  .stance-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; align-items: start; }
+  .stance {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-top: 3px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .stance.sA { border-top-color: var(--guru-a); }
+  .stance.sB { border-top-color: var(--guru-b); }
+  .stance.sC { border-top-color: var(--guru-c); }
+  .stance-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .stance-quote { font-size: 13px; color: var(--ink-2); margin: 8px 0 0; }
+  .stance-pos { font-size: 13px; margin: 6px 0 0; }
+  .stance-pos b { font-weight: 650; }
+  .stance details { margin-top: 12px; border-top: 1px solid var(--line-soft); padding-top: 10px; }
+  .stance summary {
+    cursor: pointer;
+    font-size: 12.5px;
+    font-weight: 650;
+    color: var(--guru-a);
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .stance.sB summary { color: var(--guru-b); }
+  .stance.sC summary { color: var(--guru-c); }
+  .stance summary::-webkit-details-marker { display: none; }
+  .stance summary::before { content: "▸"; font-size: 11px; }
+  .stance details[open] summary::before { content: "▾"; }
+  .stance-detail { font-size: 12.5px; color: var(--ink-2); margin: 8px 0 0; }
+  .stance-detail li { margin-bottom: 6px; }
+  .stance-detail ul { margin: 0; padding-left: 16px; }
+  .stance-detail .mono { font-size: 12px; }
+
+  .chart-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .chart-tile {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px 12px;
+  }
+  .chart-tile .k { font-size: 12px; color: var(--muted); }
+  .chart-tile .v { font-size: 24px; font-weight: 750; line-height: 1.4; }
+  .chart-tile .deltas { font-size: 12.5px; font-weight: 650; margin-bottom: 8px; }
+  .delta-down { color: var(--bear); }
+  .delta-up { color: var(--bull); }
+  .chart-tile svg, .tech-chart svg { display: block; width: 100%; height: auto; }
+  .chart-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+  .range-btns { display: flex; gap: 4px; }
+  .range-btns button {
+    font-family: inherit;
+    font-size: 11.5px;
+    font-weight: 650;
+    color: var(--ink-2);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 3px 8px;
+    cursor: pointer;
+  }
+  .range-btns button:hover { border-color: var(--muted); }
+  .range-btns button.active { background: var(--pill-strong-bg); color: var(--pill-strong-ink); border-color: var(--pill-strong-bg); }
+  .spark-line { fill: none; stroke: var(--guru-a); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .spark-dot { fill: var(--bear); }
+  .chart-note { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+
+  .tech-chart {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px 12px;
+    margin-bottom: 12px;
+  }
+  .tech-chart .t-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+  .tech-chart .t-title { font-size: 14px; font-weight: 700; }
+  .level-line { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 3; }
+  .level-label { font-size: 10px; fill: var(--muted); font-family: ui-monospace, Menlo, monospace; }
+  .anno-label { font-size: 10px; fill: var(--ink-2); }
+  .gap-band { fill: var(--warn-wash); }
+  .t-legend { font-size: 12.5px; color: var(--ink-2); margin-top: 8px; }
+  .t-legend b { font-weight: 650; }
+
+  .tk-list { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 6px 20px; }
+  .tk-item { border-bottom: 1px solid var(--line-soft); }
+  .tk-item:last-child { border-bottom: none; }
+  .tk-item summary {
+    cursor: pointer;
+    list-style: none;
+    display: grid;
+    grid-template-columns: 72px 1fr auto auto;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 0;
+  }
+  .tk-item summary::-webkit-details-marker { display: none; }
+  .tk-item .tk {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 13px;
+    font-weight: 650;
+  }
+  .tk-item .bar-track { height: 14px; display: flex; align-items: center; }
+  .tk-item .bar-fill { height: 10px; background: var(--bar); border-radius: 0 3px 3px 0; min-width: 6px; }
+  .tk-item .cnt { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--ink-2); }
+  .tk-item .arrow { font-size: 11px; color: var(--muted); }
+  .tk-item details[open] .arrow { transform: rotate(90deg); }
+  .tk-views { padding: 2px 0 12px; }
+  .tk-view { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; font-size: 13px; color: var(--ink-2); }
+  .tk-view .guru-chip { flex: none; padding-top: 1px; }
+
+  .pill {
+    display: inline-block;
+    font-size: 11.5px;
+    font-weight: 600;
+    line-height: 1;
+    padding: 4px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .senti-bull { background: var(--bull-wash); color: var(--bull); }
+  .senti-bear { background: var(--bear-wash); color: var(--bear); }
+  .senti-neut { background: var(--neut-wash); color: var(--neut); }
+  .cd {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--ink-2);
+    background: var(--neut-wash);
+    border-radius: 4px;
+    padding: 2px 7px;
+    white-space: nowrap;
+  }
+  .cd.today { background: var(--warn-wash); color: var(--warn); }
+  .verify-ok { background: var(--bull-wash); color: var(--bull); white-space: normal; line-height: 1.4; }
+  .verify-pending { background: var(--neut-wash); color: var(--neut); white-space: normal; line-height: 1.4; }
+  .verify-diff { background: var(--warn-wash); color: var(--warn); white-space: normal; line-height: 1.4; }
+  .sb-note { margin-top: 10px; font-size: 12px; color: var(--muted); }
+
+  .guru-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 650;
+    white-space: nowrap;
+  }
+  .guru-chip .gdot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .gA { color: var(--guru-a); } .gA .gdot, .bg-gA { background: var(--guru-a); }
+  .gB { color: var(--guru-b); } .gB .gdot, .bg-gB { background: var(--guru-b); }
+  .gC { color: var(--guru-c); } .gC .gdot, .bg-gC { background: var(--guru-c); }
+
+  .table-scroll { background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; min-width: 640px; }
+  th, td { text-align: left; padding: 10px 14px; font-size: 13.5px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  th { font-size: 11.5px; font-weight: 650; letter-spacing: 0.06em; color: var(--muted); white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  td.t { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+
+  .winrate-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 12px; }
+  .think-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; align-items: start; }
+  .think-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-top: 3px solid var(--pill-strong-bg);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .think-card .th-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin-bottom: 4px; flex-wrap: wrap; }
+  .think-card .th-title { font-size: 14px; font-weight: 700; }
+  .think-card .conf { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--ink-2); }
+  .think-card p { font-size: 13px; color: var(--ink-2); margin: 6px 0 0; }
+  .think-card .verify-line { font-size: 12px; color: var(--muted); margin-top: 8px; border-top: 1px solid var(--line-soft); padding-top: 8px; }
+  .review-box {
+    background: var(--card);
+    border: 1px dashed var(--line);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--ink-2);
+  }
+  .tile { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px 12px; }
+  .tile .k { font-size: 12px; color: var(--muted); }
+  .tile .v { font-size: 26px; font-weight: 750; line-height: 1.3; }
+  .tile .d { font-size: 12px; color: var(--ink-2); }
+
+  .filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .fbtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--ink-2);
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 6px 14px;
+    cursor: pointer;
+  }
+  .fbtn:hover { border-color: var(--muted); }
+  .fbtn:focus-visible { outline: 2px solid var(--guru-a); outline-offset: 1px; }
+  .fbtn.active { background: var(--pill-strong-bg); color: var(--pill-strong-ink); border-color: var(--pill-strong-bg); }
+  .fbtn .gdot { width: 8px; height: 8px; border-radius: 50%; }
+  .fcount { font-size: 12.5px; color: var(--muted); margin-left: auto; }
+  .hidden { display: none !important; }
+
+  .feed { display: flex; flex-direction: column; gap: 12px; }
+  .msg { display: flex; background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .msg-rail { flex: none; width: 4px; }
+  .msg-body { padding: 14px 18px 16px; flex: 1; min-width: 0; }
+  .msg-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .msg-time { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; color: var(--muted); }
+  .msg-orig {
+    margin: 0;
+    padding: 10px 14px;
+    background: var(--quote-bg);
+    border-radius: 6px;
+    font-size: 14px;
+    color: var(--ink);
+    white-space: pre-line;
+  }
+  .empty { text-align: center; color: var(--muted); font-size: 13.5px; padding: 32px 0; }
+
+  footer {
+    margin-top: 48px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.8;
+  }
+
+  @media (max-width: 640px) {
+    .stance-grid, .chart-grid, .winrate-grid, .think-grid { grid-template-columns: 1fr; }
+    .masthead h1 { font-size: 24px; }
+    .fcount { margin-left: 0; width: 100%; }
+    .tk-item summary { grid-template-columns: 60px 1fr auto auto; gap: 8px; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .fbtn { transition: background 0.15s ease, border-color 0.15s ease; }
+    .tk-item .arrow { transition: transform 0.15s ease; }
+  }
+
+  /* Chiikawa-style theme layer */
+  .tldr, .stance, .chart-tile, .tech-chart, .tk-list, .table-scroll, .msg, .tile, .think-card, .review-box, .notice {
+    border-radius: 18px;
+    border-width: 2px;
+    box-shadow: 0 3px 10px rgba(82, 72, 62, 0.06);
+  }
+  .msg-rail { border-radius: 18px 0 0 18px; }
+  .sec-head h2 { display: inline-flex; align-items: center; gap: 8px; }
+  .sec-head h2::before {
+    content: "";
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #F7A8C4;
+    border: 2px solid #52483E;
+    flex: none;
+  }
+  section:nth-of-type(2n) .sec-head h2::before { background: #A8CFF0; }
+  .masthead h1 { color: #52483E; }
+  .masthead h1::after { content: " ✦"; color: #F7A8C4; font-size: 20px; vertical-align: super; }
+  .live-badge { background: #FDE7F0; color: #D9628F; border-radius: 999px; }
+  .fbtn, .range-btns button { border-radius: 999px; border-width: 2px; }
+  .pill { border-radius: 999px; }
+  .cd { border-radius: 999px; }
+  .news-tag, .stance-tag, .tk-tag { border-radius: 999px; }
+  .bar-fill, .tk-item .bar-fill { border-radius: 999px; background: linear-gradient(90deg, #BBD8F2, #A8CFF0); }
+  .orig-quote, .msg-orig, .msg-read { border-radius: 14px; }
+  th { background: #FBF4EA; }
+  body { color-scheme: light; }
+  #mascot {
+    position: fixed;
+    right: 14px;
+    bottom: 12px;
+    z-index: 60;
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    pointer-events: none;
+    filter: drop-shadow(0 2px 6px rgba(82,72,62,0.15));
+  }
+  #mascot .bubble {
+    background: #FFFFFF;
+    border: 2px solid #52483E;
+    border-radius: 14px;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: #52483E;
+    max-width: 170px;
+    margin-bottom: 34px;
+  }
+  #mascot .bubble::after {
+    content: "";
+    position: absolute;
+    right: 78px;
+    bottom: 46px;
+    width: 8px; height: 8px;
+    background: #FFFFFF;
+    border-right: 2px solid #52483E;
+    border-bottom: 2px solid #52483E;
+    transform: rotate(-15deg);
+  }
+  @media (max-width: 640px) { #mascot .bubble { max-width: 120px; font-size: 11px; } }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">CATALYST CAPITAL / V3.0</p>
+    <div class="masthead-row">
+      <h1>星引模型</h1>
+      <span class="en">Catalyst Capital</span>
+      <span class="live-badge">定时刷新运行中</span>
+    </div>
+    <div class="meta-row">
+      <span class="mono">数据截至 07-19 02:45（北京时间）</span>
+      <span class="dot-sep">美股休市 · 周一 21:30 开盘</span>
+    </div>
+  </header>
+
+  <section>
+    <div class="sec-head">
+      <h2>今日速览</h2>
+    </div>
+    <div class="tldr">
+      <div class="tldr-item">
+        <span class="n">01</span>
+        <div><p>社长判断芯片短线底部已现：SMH 放量收长下影、高盛数据显示对冲基金 AI 持仓已砍到年内最低 ——「最危险的卖盘已释放大半」；但 SPX 跌破 7500 后仍有风险，建议保留现金仓位。<a class="xref" href="#chart-smh-bottom">点击看技术图解</a>。<span class="attr">—— 社长 07/18</span></p></div>
+      </div>
+      <div class="tldr-item">
+        <span class="n">02</span>
+        <div><p>社长的节奏表：GOOG 财报（北京 7/23 凌晨）之前芯片有反弹窗口，之后大波动重新回归；反弹用来调仓，不建议上重仓。另判断 AAPL 是最拥挤交易将补跌 ——「一鲸落万物生」，资金将回流芯片。<span class="attr">—— 社长 07/18</span></p></div>
+      </div>
+      <div class="tldr-item">
+        <span class="n">03</span>
+        <div><p>大胡的行情框架：这轮急跌是政治性压盘逼亚洲资金减持，「回流的资金还是在硬件」—— 他周五全天在 MU / DRAM 上做正 T，AVGO 加入死拿仓，GOOG 财报前埋伏；观察位 QQQ 682-685 缺口（<a class="xref" href="#chart-qqq-gap">点击看图</a>）。<span class="attr">—— 大胡 07/17–18</span></p></div>
+      </div>
+      <div class="tldr-item">
+        <span class="n">04</span>
+        <div><p>主任持 SPYU（4 倍杠杆标普）过周末，明确「下周看继续涨」；B 剧本：若不反弹，SPX 中期下看 7300 甚至 7000。点位卡五档与变盘日<a class="xref" href="#chart-spx-levels">点击看图</a>。<span class="attr">—— 主任 07/17</span></p></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>情报快讯</h2>
+    </div>
+    <div class="tldr">
+      <div class="tldr-item">
+        <span class="news-tag">华尔街</span>
+        <div>
+          <p>特朗普 Truth Social 帖文被打包成付费数据产品卖给对冲基金，不买就「慢人一步」。<b>白话：总统发帖已是正式行情数据源，散户别跟算法抢反应速度。</b><span class="attr">—— 社长 07/18 转述 · Claude 已溯源</span></p>
+          <details><summary>新闻原文（Claude 检索）</summary>
+            <p class="orig-src">产品名「Truth API」，8 月 1 日起向机构开放，毫秒级推送前 10 大账号帖文，传闻定价高达 $10 万/月：<br>
+            · <a href="https://www.cnbc.com/2026/07/16/trump-truth-social-wall-street-traders-api.html" target="_blank">CNBC: Trump Media launches paid data service to help Wall Street track Trump's posts</a><br>
+            · <a href="https://www.bloomberg.com/news/articles/2026-07-17/trump-media-to-sell-traders-faster-access-to-top-truth-posts" target="_blank">Bloomberg: Trump Media to Offer Traders Paid Access to Real-Time Truth Social Posts</a><br>
+            · <a href="https://www.cnn.com/2026/07/16/business/truth-social-data-wall-street" target="_blank">CNN: Truth Social will sell Wall Street quicker access to posts</a><br>
+            ✓ 与社长转述一致</p>
+          </details>
+        </div>
+      </div>
+      <div class="tldr-item">
+        <span class="news-tag">叙事</span>
+        <div>
+          <p>本轮暴跌的主流归因：国产 Kimi K3 模型发布引发「新 DeepSeek 时刻」—— 市场重新质疑 AI 算力资本开支的回报。社长的另一面视角：这是震荡洗盘的借口。<b>两种解读都值得知道。</b>最新跟进：社长转发 Arena 评测 —— Kimi-K3 已在前端代码榜以 1679 分登顶（超越 Claude Fable 5）；群友实测称「解决实际任务尚有差距但不大」。<span class="attr">—— 社长 07/18 · Claude 已溯源</span></p>
+          <details><summary>新闻原文（Claude 检索）</summary>
+            <p class="orig-src">主流媒体确认这是真实的市场叙事而非社长独家：费半指数周五盘中 -5.7%，全球芯片市值自 6/22 起蒸发约 3.3 万亿美元；台积电利润 +77% 股价仍跌 7%：<br>
+            · <a href="https://fortune.com/2026/07/17/china-moonshot-kimi-k3-markets-china-ai/" target="_blank">Fortune: Markets experience new DeepSeek shock after MoonShot AI releases Kimi K3</a><br>
+            · <a href="https://thenextweb.com/news/kimi-k3-china-ai-tech-rout-selloff" target="_blank">TNW: Kimi K3 spooked markets. The AI selloff was already loaded.</a>（观点与社长接近：K3 只是导火索，抛压早已堆积）<br>
+            · <a href="https://allweatherfinance.com/kimi-k3-triggers-another-deepseek-moment-goldman-sachs-warns-the-era-of-compute-expansion-may-have-come-to-an-end/" target="_blank">高盛警告：「算力扩张时代」或将终结</a></p>
+          </details>
+        </div>
+      </div>
+      <div class="tldr-item">
+        <span class="news-tag">数据</span>
+        <div>
+          <p>高盛：美股个股波动率大幅攀升，AI 成为胜负关键。<b>白话：个股比指数疯得多，选错票的惩罚极重。</b><span class="attr">—— 社长 07/17 转述 · Claude 已溯源</span></p>
+          <details><summary>新闻原文（Claude 检索）</summary>
+            <p class="orig-src">· <a href="https://www.goldmansachs.com/insights/the-markets/how-earnings-volatility-and-ai-capex-are-affecting-us-markets" target="_blank">高盛官网: How Earnings, Volatility, and AI Capex Are Affecting US Markets</a> —— 原文表述为「个股波动率攀升、盈利预期极高」<br>
+            <span class="diff">△ 注意：社长转述为「创 15 年新高」，Claude 未在公开报道中找到这一具体表述，可能出自高盛内部报告，保留差异标注</span></p>
+          </details>
+        </div>
+      </div>
+      <div class="tldr-item">
+        <span class="news-tag">资金</span>
+        <div>
+          <p>高盛 PB 数据：对冲基金对 AMD/美光/英伟达等 AI 篮子的敞口降至年内最低，此前连续四周净卖出科技硬件；机构建议逢低关注 Meta / Alphabet / Oracle 等云厂商。<span class="attr">—— 社长 07/18 转述 · Claude 已溯源</span></p>
+          <details><summary>新闻原文（Claude 检索）</summary>
+            <p class="orig-src">· <a href="https://www.goldmansachs.com/insights/articles/how-hedge-funds-are-trading-semiconductor-stocks" target="_blank">高盛官网: How Hedge Funds Are Trading Semiconductor Stocks</a>（性质判断：获利了结与仓位管理，而非基本面恶化）<br>
+            · <a href="https://en.bloomingbit.io/feed/news/116440" target="_blank">报道: Goldman Says Hedge Funds Cut AI Stock Exposure to Lowest Level This Year</a><br>
+            ✓ 与社长转述一致</p>
+          </details>
+        </div>
+      </div>
+      <div class="tldr-item" id="five-conditions">
+        <span class="news-tag">清单</span>
+        <div>
+          <p>社长的「SMH 健康反弹五条件」清单，周一开盘就能用来打勾。<b>只有一两只龙头涨 = 空头回补，别当反转；周一第一次高开不要直接当趋势反转。</b><span class="attr">—— 社长 07/18 原创方法论</span></p>
+          <details><summary>五条件全文（社长原创，无外部出处）</summary>
+            <blockquote class="orig-quote">① SOX 和 SMH 不再创新低
+② VIX 无法突破 20
+③ 原油与美债收益率停止上涨
+④ 半导体设备、存储、GPU 和模拟芯片同步回升
+⑤ 纳斯达克市场广度改善
+—— 观察名单：NVDA、AMD、MU、AVGO、LRCX、AMAT、KLAC</blockquote>
+          </details>
+        </div>
+      </div>
+      <div class="tldr-item">
+        <span class="news-tag">前瞻</span>
+        <div>
+          <p>GOOG 财报数字面：市场预期营收约 1171 亿美元、EPS 约 2.90、Cloud 增速约 65%，期权定价财报后 ±6% 波动；周一周二的芯片波动很多属于财报前调仓。<span class="attr">—— 社长 07/18</span></p>
+          <details><summary>出处与 PDF 说明</summary>
+            <p class="orig-src">· 官方入口：<a href="https://abc.xyz/investor/" target="_blank">Alphabet 投资者关系</a>（财报北京 7/23 凌晨发布，电话会 04:30）<br>
+            · 📎 社长另发 3 份财报前瞻 PDF（谷歌/特斯拉/英特尔）+ 2 份日报 —— 知识星球付费附件无法外链，<a href="https://wx.zsxq.com/group/15555452148452" target="_blank">到星球下载（需登录）</a></p>
+          </details>
+        </div>
+      </div>
+      <div class="tldr-item">
+        <span class="news-tag">产业</span>
+        <div>
+          <p>台积电电话会玻璃基板（CoPoS）解读：试产线尚需约一年成熟，量产要到 2028；当前蹭概念的多数公司进不了最终供应链。<b>白话：玻璃基板妖股别乱追。</b><span class="attr">—— 社长 07/18 转载分析 · Claude 已溯源</span></p>
+          <details><summary>新闻原文（Claude 检索）</summary>
+            <p class="orig-src">· <a href="https://finance.biggo.com/news/kLg0kp4BrX5PFN7BKrXD" target="_blank">报道: 魏哲家称玻璃基板量产「没有捷径」，至少还需 2-3 年</a><br>
+            · <a href="https://www.trendforce.com/news/2026/04/13/news-tsmc-advances-panel-level-packaging-copos-pilot-line-reportedly-set-for-june-completion-2028-29-ramp-eyed/" target="_blank">TrendForce: CoPoS 试产线 6 月完成，2028–29 量产</a><br>
+            ✓ 时间线与社长转载的分析大体一致（试产 2027 / 量产 2028）</p>
+          </details>
+        </div>
+      </div>
+      <div class="tldr-item">
+        <span class="news-tag">监控</span>
+        <div>
+          <p>社长上线「韩国散户杠杆 · 精细化监控」数据看板（配图帖）—— 他在给自己的「韩国历史大顶」判断做持续数据跟踪，重点盯散户杠杆率的变化。<b>白话：他不是喊完就跑的类型，这个判断他自己在记账 —— 星引模型的胜率%板块会和他对着记。</b><span class="attr">—— 社长 07/18（图表在星球帖内）</span></p>
+        </div>
+      </div>
+      <div class="tldr-item">
+        <span class="news-tag">监控</span>
+        <div>
+          <p>社长分享了「韩国散户杠杆 · 精细化监控」实时仪表盘 → <a class="xref" href="https://kimpremium.com/" target="_blank">kimpremium.com（点击打开）</a> —— 给他的韩国大顶判断（07/07 提出）配上了逐日监控：<b>杠杆温度计</b>（融资余额+杠杆ETF申购 vs 场内存款）、<b>强平爆仓日监控</b>、<b>融资强度十年百分位</b>（KOSPI 对比标普）、<b>场外保证金水位</b>，单位万亿韩元。他说的「散户人均 5 倍杠杆、指数跌 20% 大面积爆仓」，以后在这个站上可以逐日验证。<span class="attr">—— 社长 07/18 · Claude 已核站点内容</span></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>重大事件雷达</h2>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>日期</th>
+            <th>倒计时</th>
+            <th>事件</th>
+            <th>时间（北京）</th>
+            <th>来源</th>
+            <th>日期核实</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="t">07/20–24</td>
+            <td><span class="cd" data-evt-date="2026-07-20T00:00:00+08:00" data-evt-end="2026-07-25T06:00:00+08:00"></span></td>
+            <td><a class="evt-link" href="https://www.farnboroughairshow.com/fia2026/" target="_blank">范堡罗国际航展</a>（Boeing / Airbus / 国防AI / eVTOL）</td>
+            <td class="t">英国当地</td>
+            <td><span class="guru-chip gB"><span class="gdot"></span>社长</span></td>
+            <td><span class="pill verify-ok">✓ 核实一致（官网）</span></td>
+          </tr>
+          <tr>
+            <td class="t">07/21</td>
+            <td><span class="cd" data-evt-date="2026-07-21T06:45:00+08:00"></span></td>
+            <td><a class="evt-link" href="https://www.spacex.com/launches/starship-flight-13" target="_blank">SpaceX 星舰第 13 次试飞</a>（90 分钟窗口 · 官网直播）</td>
+            <td class="t">06:45</td>
+            <td><span class="guru-chip gB"><span class="gdot"></span>社长</span></td>
+            <td><span class="pill verify-ok">✓ 核实一致（Space.com）</span></td>
+          </tr>
+          <tr>
+            <td class="t">07/23</td>
+            <td><span class="cd" data-evt-date="2026-07-23T00:00:00+08:00"></span></td>
+            <td><a class="evt-link" href="https://developer.apple.com/wwdc26/schedule/" target="_blank">Apple WWDC26 落地场次</a>（iOS 27 端侧 AI · 官网日程）</td>
+            <td class="t">线上</td>
+            <td><span class="guru-chip gB"><span class="gdot"></span>社长</span></td>
+            <td><span class="pill verify-diff">△ 部分核实：7/23 属实；7/21 场次与 App Review 咨询未找到佐证</span></td>
+          </tr>
+          <tr>
+            <td class="t">07/22</td>
+            <td><span class="cd" data-evt-date="2026-07-22T21:00:00+08:00"></span></td>
+            <td><a class="evt-link" href="https://news.samsung.com/global/galaxy-unpacked-july-2026" target="_blank">三星 Galaxy Unpacked 伦敦</a>（官网 + YouTube 直播）</td>
+            <td class="t">21:00</td>
+            <td><span class="guru-chip gB"><span class="gdot"></span>社长</span></td>
+            <td><span class="pill verify-ok">✓ 核实一致（三星官方）</span></td>
+          </tr>
+          <tr>
+            <td class="t">07/22</td>
+            <td><span class="cd" data-evt-date="2026-07-22T22:00:00+08:00"></span></td>
+            <td><a class="evt-link" href="https://techcommunity.microsoft.com/blog/partnernews/save-the-date-mcaps-start-for-partners-is-july-22-2026/4514596" target="_blank">微软 MCAPS 新财年启动会</a>（线上活动页）</td>
+            <td class="t">22:00</td>
+            <td><span class="guru-chip gB"><span class="gdot"></span>社长</span></td>
+            <td><span class="pill verify-ok">✓ 核实一致（微软官方）</span></td>
+          </tr>
+          <tr>
+            <td class="t">07/23</td>
+            <td><span class="cd" data-evt-date="2026-07-23T04:30:00+08:00"></span></td>
+            <td><b><a class="evt-link" href="https://abc.xyz/investor/" target="_blank">GOOG 财报</a></b>（美股周三盘后 · 电话会 04:30 · IR 官网直播）</td>
+            <td class="t">04:30</td>
+            <td><span class="guru-chip gB"><span class="gdot"></span>社长</span></td>
+            <td><span class="pill verify-ok">✓ 核实一致</span></td>
+          </tr>
+          <tr>
+            <td class="t">07/23</td>
+            <td><span class="cd" data-evt-date="2026-07-23T05:30:00+08:00"></span></td>
+            <td><b><a class="evt-link" href="https://ir.tesla.com/" target="_blank">TSLA 财报</a></b>（美股周三盘后 · 电话会 05:30 · IR 官网直播）</td>
+            <td class="t">05:30</td>
+            <td><span class="guru-chip gB"><span class="gdot"></span>社长</span></td>
+            <td><span class="pill verify-ok">✓ 核实一致</span></td>
+          </tr>
+          <tr>
+            <td class="t">07/23</td>
+            <td><span class="cd" data-evt-date="2026-07-23T00:00:00+08:00"></span></td>
+            <td>主任变盘日（JXT 点位卡体系，上一个是 07/18）</td>
+            <td class="t">美股时段</td>
+            <td><span class="guru-chip gA"><span class="gdot"></span>主任</span></td>
+            <td><span class="pill verify-pending">体系内指标（无外部可核）</span></td>
+          </tr>
+          <tr>
+            <td class="t">07/23–24</td>
+            <td><span class="cd" data-evt-date="2026-07-23T00:00:00+08:00" data-evt-end="2026-07-24T12:00:00+08:00"></span></td>
+            <td><a class="evt-link" href="https://www.amd.com/en/corporate/events/advancing-ai.html" target="_blank">AMD Advancing AI 大会</a>（MI450 / Helios · 苏姿丰演讲 7/24 00:30 · 官网+YouTube 直播）</td>
+            <td class="t">两天</td>
+            <td><span class="guru-chip gB"><span class="gdot"></span>社长</span></td>
+            <td><span class="pill verify-ok">✓ 核实一致（AMD 官方）</span></td>
+          </tr>
+          <tr>
+            <td class="t">07/24</td>
+            <td><span class="cd" data-evt-date="2026-07-24T05:00:00+08:00"></span></td>
+            <td><b><a class="evt-link" href="https://www.intc.com/" target="_blank">INTC 财报</a></b>（美股周四盘后 · 电话会 05:00 · IR 官网直播）</td>
+            <td class="t">05:00</td>
+            <td><span class="guru-chip gB"><span class="gdot"></span>社长</span></td>
+            <td><span class="pill verify-ok">✓ 核实一致</span></td>
+          </tr>
+          <tr>
+            <td class="t">07/25</td>
+            <td><span class="cd" data-evt-date="2026-07-25T04:00:00+08:00"></span></td>
+            <td>美股周度期权到期（SanDisk / WDC 等高 Gamma 仓位）</td>
+            <td class="t">凌晨收盘</td>
+            <td><span class="guru-chip gB"><span class="gdot"></span>社长</span></td>
+            <td><span class="pill verify-ok">✓ 核实（7/24 为周五到期日）</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="sb-note">7 天外事件临近时自动进入雷达（下一个：FOMC 议息 7/28–29，决议北京 7/30 凌晨 02:00，Claude 已核实）。</p>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>盘面情报</h2>
+      <span class="sub">以标普与纳指为主 · 每次刷新更新到当时点 · 当前为周五收盘</span>
+    </div>
+    <div class="chart-grid">
+      <div class="chart-tile">
+        <div class="chart-head">
+          <div>
+            <div class="k">标普 500 · SPX</div>
+            <div class="v mono">7457.69</div>
+          </div>
+          <div class="range-btns" data-chart="spx">
+            <button data-range="d3m">3月</button>
+            <button data-range="d1m" class="active">1月</button>
+            <button data-range="d1w">1周</button>
+            <button data-range="d1d">1日</button>
+          </div>
+        </div>
+        <div class="deltas" id="delta-spx"></div>
+        <svg viewBox="0 0 260 64" role="img" aria-label="标普500走势" id="chart-spx">
+          <polyline class="spark-line" points=""/>
+          <circle class="spark-dot" r="3"/>
+        </svg>
+        <div class="chart-note">已跌破 7500 关口 —— 数据 Yahoo Finance</div>
+      </div>
+      <div class="chart-tile">
+        <div class="chart-head">
+          <div>
+            <div class="k">纳斯达克综合 · IXIC</div>
+            <div class="v mono">25520.24</div>
+          </div>
+          <div class="range-btns" data-chart="ixic">
+            <button data-range="d3m">3月</button>
+            <button data-range="d1m" class="active">1月</button>
+            <button data-range="d1w">1周</button>
+            <button data-range="d1d">1日</button>
+          </div>
+        </div>
+        <div class="deltas" id="delta-ixic"></div>
+        <svg viewBox="0 0 260 64" role="img" aria-label="纳斯达克走势" id="chart-ixic">
+          <polyline class="spark-line" points=""/>
+          <circle class="spark-dot" r="3"/>
+        </svg>
+        <div class="chart-note">周五芯片领跌 —— 数据 Yahoo Finance</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head" id="tech-charts">
+      <h2>技术图解</h2>
+    </div>
+
+    <div class="tech-chart" id="chart-spx-levels">
+      <div class="t-head">
+        <span class="t-title">SPX × 主任点位卡（JXT v6.3）</span>
+        <span class="guru-chip gA"><span class="gdot"></span>主任 07/16</span>
+      </div>
+      <svg viewBox="0 0 480 200" role="img" aria-label="标普500与主任点位卡">
+        <line class="level-line" x1="8" y1="20.5" x2="440" y2="20.5"/><text class="level-label" x="443" y="23.5">7602</text>
+        <line class="level-line" x1="8" y1="39.3" x2="440" y2="39.3"/><text class="level-label" x="443" y="42.3">7562</text>
+        <line class="level-line" x1="8" y1="62.8" x2="440" y2="62.8"/><text class="level-label" x="443" y="65.8">7512</text>
+        <line class="level-line" x1="8" y1="162.6" x2="440" y2="162.6"/><text class="level-label" x="443" y="165.6">7300</text>
+        <polyline class="spark-line" points="8,68.2 32.4,81.3 56.8,131.8 81.3,135.2 105.7,135.5 130.1,137.2 154.5,96.5 178.9,68.8 203.4,76.4 227.8,76.4 252.2,50.9 276.6,66.7 301.1,76.6 325.5,47.9 349.9,33 374.3,61.3 398.7,47.9 423.2,34.4 447.6,52.6 472,88.4"/>
+        <circle class="spark-dot" cx="472" cy="88.4" r="3.5"/>
+        <text class="anno-label" x="270" y="16">点位卡区间 7512–7602（高位震荡）</text>
+        <text class="anno-label" x="300" y="176">B 剧本目标 7300（更远 7000）</text>
+      </svg>
+      <p class="t-legend"><b>看图学：</b>价格已跌出主任点位卡的下沿 7512，收在 7458 —— 意味着他的「高位震荡」框架被击穿，下周要么快速收复 7512（他的 A 剧本：反弹继续涨），要么按 B 剧本走向 7300。变盘日 07/18、07/23。<span class="attr">—— 主任观点 · Claude 绘图</span></p>
+    </div>
+
+    <div class="tech-chart" id="chart-smh-bottom">
+      <div class="t-head">
+        <span class="t-title">SMH × 社长的「短线底部」证据</span>
+        <span class="guru-chip gB"><span class="gdot"></span>社长 07/18</span>
+      </div>
+      <svg viewBox="0 0 480 200" role="img" aria-label="SMH近一月走势与底部信号">
+        <line class="level-line" x1="8" y1="19.8" x2="440" y2="19.8"/><text class="level-label" x="443" y="22.8">669</text>
+        <line class="level-line" x1="8" y1="163.6" x2="440" y2="163.6"/><text class="level-label" x="443" y="166.6">557</text>
+        <polyline class="spark-line" points="8,31.4 32.4,19.8 56.8,79.8 81.3,83.8 105.7,60.8 130.1,93.1 154.5,67.1 178.9,36.5 203.4,81.8 227.8,117.9 252.2,102.5 276.6,131.7 301.1,117 325.5,98.1 349.9,93.9 374.3,126.4 398.7,107.6 423.2,119.8 447.6,147.8 472,163.6"/>
+        <circle class="spark-dot" cx="472" cy="163.6" r="3.5"/>
+        <text class="anno-label" x="40" y="14">月内高点 668.91</text>
+        <text class="anno-label" x="250" y="192">周五低开收高 +1.57%，低点 536.8 获承接</text>
+      </svg>
+      <p class="t-legend"><b>看图学：</b>SMH 一个月从 669 跌到 557（月内 -16.8%，社长称高点回撤 22% 系自历史最高点起算）。周五跳空低开后大幅杀跌又收回开盘价上方 —— 长下影线 = 低位有真金白银承接，这是社长「短线底部已现」的图形依据；配合对冲基金持仓已降到年内最低（燃料不足），构成他的抄底逻辑。反弹是否健康，看他的<a class="xref" href="#five-conditions">五条件清单（点击查看）</a>。<span class="attr">—— 社长观点 · Claude 绘图并核实数据（他称收高开盘 3%，实为 +1.57%）</span></p>
+    </div>
+
+    <div class="tech-chart" id="chart-qqq-gap">
+      <div class="t-head">
+        <span class="t-title">QQQ × 大胡的缺口观察位</span>
+        <span class="guru-chip gC"><span class="gdot"></span>大胡 07/17</span>
+      </div>
+      <svg viewBox="0 0 480 200" role="img" aria-label="QQQ近一月走势与682-685缺口">
+        <rect class="gap-band" x="8" y="155.3" width="432" height="7.1"/>
+        <text class="anno-label" x="16" y="150">缺口 682–685</text>
+        <polyline class="spark-line" points="8,22.5 32.4,28.8 56.8,86.9 81.3,94.1 105.7,80.3 130.1,103.9 154.5,62 178.9,32.5 203.4,59.4 227.8,89.4 252.2,65 276.6,96.9 301.1,92.1 325.5,63.9 349.9,58.5 374.3,91.4 398.7,72.4 423.2,77.1 447.6,105.3 472,130.6"/>
+        <circle class="spark-dot" cx="472" cy="130.6" r="3.5"/>
+        <text class="anno-label" x="290" y="146">现价 695.33，缺口在下方 ~1.5%</text>
+      </svg>
+      <p class="t-legend"><b>看图学：</b>「缺口」= 某天跳空留下的没有成交的价格区间，市场常有回补缺口的引力。QQQ 下方 682-685 有个缺口（黄色带），大胡的打法：要么等价格下来补掉缺口再买（低吸），要么等 V 型反转确认再追 —— 两种都比在半山腰接刀安全。<span class="attr">—— 大胡观点 · Claude 绘图</span></p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>个股观点台</h2>
+    </div>
+    <div class="tk-list">
+      <div class="tk-item"><details>
+        <summary><span class="tk">MU</span><span class="bar-track"><span class="bar-fill" style="width:100%"></span></span><span class="cnt">提及 18 次</span><span class="arrow">▸</span></summary>
+        <div class="tk-views">
+          <div class="tk-view"><span class="guru-chip gC"><span class="gdot"></span>大胡</span><span>主战场：底仓+做T，周五 807-864 区间数个来回，820 以下计划再接；「回流的资金还是在硬件」。<span class="attr">07/17–18</span></span></div>
+          <div class="tk-view"><span class="guru-chip gB"><span class="gdot"></span>社长</span><span>高盛 AI 篮子成分股，机构持仓已砍至年内最低（跌的燃料在减少）；但另提醒：美光财报后连续两天千亿美元成交，高位套牢几百亿 —— 有行情机构也要先暴力砸盘。<span class="attr">07/18 · 本周</span></span></div>
+        </div>
+      </details></div>
+      <div class="tk-item"><details>
+        <summary><span class="tk">SMH</span><span class="bar-track"><span class="bar-fill" style="width:39%"></span></span><span class="cnt">提及 7 次</span><span class="arrow">▸</span></summary>
+        <div class="tk-views">
+          <div class="tk-view"><span class="guru-chip gB"><span class="gdot"></span>社长</span><span>短线底部已现（放量长下影 + 机构持仓出清）；高位回撤 22% 但基本面没坏 —— 芯片板块利润增速预期 131%；健康反弹按<a class="xref" href="#five-conditions">五条件清单（点击查看）</a>打勾。<span class="attr">07/18</span></span></div>
+          <div class="tk-view"><span class="guru-chip gA"><span class="gdot"></span>主任</span><span>上周三盘中提示「做短线的可以试试 SPYU 或者 SOXX」—— 他碰半导体只用指数 ETF。<span class="attr">07/15</span></span></div>
+        </div>
+      </details></div>
+      <div class="tk-item"><details>
+        <summary><span class="tk">SPX</span><span class="bar-track"><span class="bar-fill" style="width:33%"></span></span><span class="cnt">提及 6 次</span><span class="arrow">▸</span></summary>
+        <div class="tk-views">
+          <div class="tk-view"><span class="guru-chip gA"><span class="gdot"></span>主任</span><span>点位卡 7602/7582/7562/7542/7512 五档、变盘日 07/18·07/23；持 SPYU 过周末看涨；B 剧本 7300/7000。<span class="attr">07/16–17</span></span></div>
+          <div class="tk-view"><span class="guru-chip gB"><span class="gdot"></span>社长</span><span>跌破 7500 后仍有风险，财报季开局大盘可能继续往下走，保留现金仓位以备不时之需。<span class="attr">07/18</span></span></div>
+        </div>
+      </details></div>
+      <div class="tk-item"><details>
+        <summary><span class="tk">GOOG</span><span class="bar-track"><span class="bar-fill" style="width:28%"></span></span><span class="cnt">提及 5 次</span><span class="arrow">▸</span></summary>
+        <div class="tk-views">
+          <div class="tk-view"><span class="guru-chip gB"><span class="gdot"></span>社长</span><span>「未来一周 AI 产业链最重要的定价事件」—— 任何资本开支放缓信号都会传导到整个硬件链；期权定价 ±6%。<span class="attr">07/18</span></span></div>
+          <div class="tk-view"><span class="guru-chip gC"><span class="gdot"></span>大胡</span><span>348 开 1/3 仓 + 343.4 补 1/6 摊薄 —— 财报前左侧埋伏。<span class="attr">07/17</span></span></div>
+        </div>
+      </details></div>
+      <div class="tk-item"><details>
+        <summary><span class="tk">AVGO</span><span class="bar-track"><span class="bar-fill" style="width:22%"></span></span><span class="cnt">提及 4 次</span><span class="arrow">▸</span></summary>
+        <div class="tk-views">
+          <div class="tk-view"><span class="guru-chip gC"><span class="gdot"></span>大胡</span><span>362 加 1/6 进「死拿仓」（长期底仓）；另有 376 做T仓 —— 把这轮下跌当长线上车机会。<span class="attr">07/16–17</span></span></div>
+          <div class="tk-view"><span class="guru-chip gB"><span class="gdot"></span>社长</span><span>周一反弹观察名单成员（NVDA/AMD/MU/AVGO/LRCX/AMAT/KLAC）。<span class="attr">07/18</span></span></div>
+        </div>
+      </details></div>
+      <div class="tk-item"><details>
+        <summary><span class="tk">QQQ</span><span class="bar-track"><span class="bar-fill" style="width:17%"></span></span><span class="cnt">提及 3 次</span><span class="arrow">▸</span></summary>
+        <div class="tk-views">
+          <div class="tk-view"><span class="guru-chip gC"><span class="gdot"></span>大胡</span><span>682-685 缺口是关键观察位：等补缺或 V 转确认再加日内仓（<a class="xref" href="#chart-qqq-gap">点击看图</a>）。<span class="attr">07/17</span></span></div>
+        </div>
+      </details></div>
+      <div class="tk-item"><details>
+        <summary><span class="tk">NVDA</span><span class="bar-track"><span class="bar-fill" style="width:22%"></span></span><span class="cnt">提及 4 次</span><span class="arrow">▸</span></summary>
+        <div class="tk-views">
+          <div class="tk-view"><span class="guru-chip gB"><span class="gdot"></span>社长</span><span>高盛 AI 篮子核心成分（机构持仓年内最低）；周一反弹观察名单第一位；财报前波动多属调仓别全当基本面。<span class="attr">07/18</span></span></div>
+          <div class="tk-view"><span class="guru-chip gC"><span class="gdot"></span>大胡</span><span>公式手册历史案例：NVDL（2 倍杠杆）73.98 与 74 精准双底 —— 他的「市值理论」样本之一。<span class="attr">2025-12</span></span></div>
+        </div>
+      </details></div>
+      <div class="tk-item"><details>
+        <summary><span class="tk">AMD</span><span class="bar-track"><span class="bar-fill" style="width:17%"></span></span><span class="cnt">提及 3 次</span><span class="arrow">▸</span></summary>
+        <div class="tk-views">
+          <div class="tk-view"><span class="guru-chip gB"><span class="gdot"></span>社长</span><span>高盛篮子成分 + 观察名单；下周 Advancing AI 大会是关键催化 —— 市场要的不是「也有 AI 平台」而是明确客户与收入曲线，PE 162 倍已提前交易份额提升。<span class="attr">07/18</span></span></div>
+        </div>
+      </details></div>
+      <div class="tk-item"><details>
+        <summary><span class="tk">TSM</span><span class="bar-track"><span class="bar-fill" style="width:17%"></span></span><span class="cnt">提及 3 次</span><span class="arrow">▸</span></summary>
+        <div class="tk-views">
+          <div class="tk-view"><span class="guru-chip gB"><span class="gdot"></span>社长</span><span>财报电话会 CoPoS 玻璃基板细读：试产线还需约一年成熟、量产 2028，蹭概念公司大多进不了最终供应链；财报利润 +77% 但股价被 K3 叙事拖跌 7%。<span class="attr">07/18</span></span></div>
+        </div>
+      </details></div>
+      <div class="tk-item"><details>
+        <summary><span class="tk">AAPL</span><span class="bar-track"><span class="bar-fill" style="width:17%"></span></span><span class="cnt">提及 3 次</span><span class="arrow">▸</span></summary>
+        <div class="tk-views">
+          <div class="tk-view"><span class="guru-chip gB"><span class="gdot"></span>社长</span><span>最拥挤交易将补跌：机构抱团拉到历史新高但基本面一般（存储涨价、手机电脑销量下滑）——「一鲸落万物生」，苹果补跌之日即资金回流芯片之时；WWDC26 落地周 7/23 有场次。<span class="attr">07/18</span></span></div>
+        </div>
+      </details></div>
+      <div class="tk-item"><details>
+        <summary><span class="tk">TSLA</span><span class="bar-track"><span class="bar-fill" style="width:17%"></span></span><span class="cnt">提及 3 次</span><span class="arrow">▸</span></summary>
+        <div class="tk-views">
+          <div class="tk-view"><span class="guru-chip gB"><span class="gdot"></span>社长</span><span>财报（7/23 凌晨）真正变量在毛利率与自由现金流（交付 48 万辆已提前知晓）；PE 349 倍需要 Robotaxi/机器人给出可量化数字。<span class="attr">07/18</span></span></div>
+          <div class="tk-view"><span class="guru-chip gC"><span class="gdot"></span>大胡</span><span>TSLL（2倍杠杆）做T：11.73 进 → 12.05/12.21 全出；11.55 再进 —— 纯短线工具不留恋。<span class="attr">07/16–17</span></span></div>
+        </div>
+      </details></div>
+      <div class="tk-item"><details>
+        <summary><span class="tk">INTC</span><span class="bar-track"><span class="bar-fill" style="width:11%"></span></span><span class="cnt">提及 2 次</span><span class="arrow">▸</span></summary>
+        <div class="tk-views">
+          <div class="tk-view"><span class="guru-chip gB"><span class="gdot"></span>社长</span><span>「下周主要看 GOOG 和 INTC 两家」—— 芯片方向确认的钥匙之一；财报重点 18A 良率与外部代工客户，强预期弱利润、事件高度二元。<span class="attr">07/18</span></span></div>
+        </div>
+      </details></div>
+      <div class="tk-item"><details>
+        <summary><span class="tk">META</span><span class="bar-track"><span class="bar-fill" style="width:11%"></span></span><span class="cnt">提及 2 次</span><span class="arrow">▸</span></summary>
+        <div class="tk-views">
+          <div class="tk-view"><span class="guru-chip gB"><span class="gdot"></span>社长</span><span>高盛倾向建议逢低关注的云厂商之一（相对芯片跌幅有限、现金流稳）。<span class="attr">07/18（引高盛）</span></span></div>
+        </div>
+      </details></div>
+      <div class="tk-item"><details>
+        <summary><span class="tk">ORCL</span><span class="bar-track"><span class="bar-fill" style="width:6%"></span></span><span class="cnt">提及 1 次</span><span class="arrow">▸</span></summary>
+        <div class="tk-views">
+          <div class="tk-view"><span class="guru-chip gB"><span class="gdot"></span>社长</span><span>高盛建议逢低关注的云厂商之一（相对芯片涨幅落后）。<span class="attr">07/18（引高盛）</span></span></div>
+        </div>
+      </details></div>
+      <div class="tk-item"><details>
+        <summary><span class="tk">IBM</span><span class="bar-track"><span class="bar-fill" style="width:11%"></span></span><span class="cnt">提及 2 次</span><span class="arrow">▸</span></summary>
+        <div class="tk-views">
+          <div class="tk-view"><span class="guru-chip gC"><span class="gdot"></span>大胡</span><span>做T记录：217.8 进 → 219.35 出一半。<span class="attr">07/16</span></span></div>
+        </div>
+      </details></div>
+      <div class="tk-item"><details>
+        <summary><span class="tk">VRT</span><span class="bar-track"><span class="bar-fill" style="width:6%"></span></span><span class="cnt">提及 1 次</span><span class="arrow">▸</span></summary>
+        <div class="tk-views">
+          <div class="tk-view"><span class="guru-chip gB"><span class="gdot"></span>社长</span><span>GOOG 财报前调仓波动名单成员（与 NVDA/AVGO/MU 并列）—— AI 资本开支传导链上的电力设备端。<span class="attr">07/18</span></span></div>
+        </div>
+      </details></div>
+      <div class="tk-item"><details>
+        <summary><span class="tk">LRCX 等设备</span><span class="bar-track"><span class="bar-fill" style="width:6%"></span></span><span class="cnt">提及 1 次</span><span class="arrow">▸</span></summary>
+        <div class="tk-views">
+          <div class="tk-view"><span class="guru-chip gB"><span class="gdot"></span>社长</span><span>LRCX / AMAT / KLAC 在周一反弹观察名单中 —— 健康反弹需要设备、存储、GPU、模拟芯片同步回升（<a class="xref" href="#five-conditions">五条件清单</a>第④条）。<span class="attr">07/18</span></span></div>
+        </div>
+      </details></div>
+      <div class="tk-item"><details>
+        <summary><span class="tk">PL</span><span class="bar-track"><span class="bar-fill" style="width:17%"></span></span><span class="cnt">提及 3 次</span><span class="arrow">▸</span></summary>
+        <div class="tk-views">
+          <div class="tk-view"><span class="guru-chip gC"><span class="gdot"></span>大胡</span><span>新开仓：21.7 进 1/3，支撑 21、破 20.5 止损，23 已出半；选股逻辑「火箭炸了配件商反而多卖一份」（不选 RKLB 的原因）。<span class="attr">07/17–18</span></span></div>
+        </div>
+      </details></div>
+      <div class="tk-item"><details>
+        <summary><span class="tk">CBRS</span><span class="bar-track"><span class="bar-fill" style="width:11%"></span></span><span class="cnt">提及 2 次</span><span class="arrow">▸</span></summary>
+        <div class="tk-views">
+          <div class="tk-view"><span class="guru-chip gC"><span class="gdot"></span>大胡</span><span>165.5 开 1/3 仓 → 174.4 出一半（隔日 +5.4%）。<span class="attr">07/17</span></span></div>
+        </div>
+      </details></div>
+      <div class="tk-item"><details>
+        <summary><span class="tk">CONL</span><span class="bar-track"><span class="bar-fill" style="width:17%"></span></span><span class="cnt">提及 3 次</span><span class="arrow">▸</span></summary>
+        <div class="tk-views">
+          <div class="tk-view"><span class="guru-chip gC"><span class="gdot"></span>大胡</span><span>Coinbase 2 倍杠杆：4.75 半笔死拿 + 5.0 做T（已平）+ 4.79 回补 —— 币圈敞口用它管理。<span class="attr">07/16–18</span></span></div>
+        </div>
+      </details></div>
+      <div class="tk-item"><details>
+        <summary><span class="tk">RKLB</span><span class="bar-track"><span class="bar-fill" style="width:6%"></span></span><span class="cnt">提及 1 次</span><span class="arrow">▸</span></summary>
+        <div class="tk-views">
+          <div class="tk-view"><span class="guru-chip gC"><span class="gdot"></span>大胡</span><span>明确不选：「火箭发射失败太多」—— 同板块转投配件商 PL。<span class="attr">07/18</span></span></div>
+        </div>
+      </details></div>
+      <div class="tk-item"><details>
+        <summary><span class="tk">三星/海力士</span><span class="bar-track"><span class="bar-fill" style="width:17%"></span></span><span class="cnt">提及 3 次</span><span class="arrow">▸</span></summary>
+        <div class="tk-views">
+          <div class="tk-view"><span class="guru-chip gB"><span class="gdot"></span>社长</span><span>韩国大顶三支柱：三星利润率历史峰值不可持续、美光高位天量套牢、海力士 IPO 将重演 SpaceX 式炒作后阴跌（07/07 提出）；07/18 上线「散户杠杆精细化监控」逐日跟踪。<span class="attr">07/07 · 07/18</span></span></div>
+        </div>
+      </details></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>三人立场</h2>
+      <span class="sub">截至周五美股收盘 · 点开各卡片可看持仓与操作细节</span>
+    </div>
+    <div class="stance-grid">
+      <div class="stance sA">
+        <div class="stance-head">
+          <span class="guru-chip gA"><span class="gdot"></span>主任 · 标普大盘</span>
+          <span class="pill senti-bull">偏多</span>
+        </div>
+        <p class="stance-pos">持仓：<b>SPYU（4x 标普）留过周末</b></p>
+        <p class="stance-quote">「下周看继续涨」；B 剧本：若无反弹，下看 7300 / 7000</p>
+        <details>
+          <summary>主任的操作细节</summary>
+          <div class="stance-detail">
+            <ul>
+              <li><b>当前持仓</b>：SPYU（4 倍杠杆标普 ETN），07/17 明确「留周末，下周看继续涨」</li>
+              <li><b>点位卡</b>（07/16，JXT v6.3）：SPX <span class="mono">7602 / 7582 / 7562 / 7542 / 7512</span>；变盘日 07/16、07/18、07/23；结论「高位震荡」（<a class="xref" href="#chart-spx-levels">点击看图</a>）</li>
+              <li><b>B 剧本</b>（07/17）：若不反弹，中期目标 7300 甚至 7000（「不是一天，而是目标」）</li>
+              <li><b>纪律</b>：反复叮嘱群友不要买期权；高位震荡期不乱开个股仓</li>
+              <li><b>上周回放</b>：07/15 盘中给 7503 末日点位（到点即超卖反弹，兑现）</li>
+            </ul>
+          </div>
+        </details>
+      </div>
+      <div class="stance sB">
+        <div class="stance-head">
+          <span class="guru-chip gB"><span class="gdot"></span>社长 · 深度研究</span>
+          <span class="pill senti-neut">谨慎</span>
+        </div>
+        <p class="stance-pos">仓位：<b>3 成持仓 + 7 成现金</b>，8/5 后再打满</p>
+        <p class="stance-quote">SMH 短线底已现、GOOG 财报前有反弹；AAPL 拥挤将补跌 ——「一鲸落万物生」</p>
+        <details>
+          <summary>社长的操作细节</summary>
+          <div class="stance-detail">
+            <ul>
+              <li><b>仓位</b>（07/18）：3 成持仓 + 7 成现金，等 8/5 财报季大头落地后打满；「一点也不会有踏空或亏钱的焦虑」</li>
+              <li><b>3 成仓方向</b>：群友追问布局方向，截至本页更新<b>未见回答</b>（如实记录，持续盯）</li>
+              <li><b>节奏观</b>：抄底「一般都要筑双底，V 形反转在市场里很少」—— 不急于第一时间接飞刀</li>
+              <li><b>观点组合</b>：SMH 短线底 → GOOG 财报前反弹窗口 → 之后大波动回归；AAPL 拥挤将补跌；韩国大顶 60%+</li>
+              <li><b>研究输出</b>：本周 5 份 PDF（3 份财报前瞻 + 2 份日报），星球帖内下载</li>
+            </ul>
+          </div>
+        </details>
+      </div>
+      <div class="stance sC">
+        <div class="stance-head">
+          <span class="guru-chip gC"><span class="gdot"></span>大胡 · 实盘快枪</span>
+          <span class="pill senti-bull">做多硬件</span>
+        </div>
+        <p class="stance-pos">持仓：<b>MU / AVGO / GOOG / CONL / CBRS / PL</b></p>
+        <p class="stance-quote">「回流的资金还是在硬件」—— 急跌做正 T，反弹分批出</p>
+        <details>
+          <summary>大胡的操作细节</summary>
+          <div class="stance-detail">
+            <ul>
+              <li><b>MU（主战场）</b>：底仓+做T，07/17 <span class="mono">807/827/844</span> 分批接、<span class="mono">829/855/861/864</span> 分批出；<span class="mono">820</span> 以下计划再接</li>
+              <li><b>AVGO</b>：<span class="mono">362</span> 加 1/6 进死拿仓；<span class="mono">376</span> 另有做T仓</li>
+              <li><b>GOOG</b>：<span class="mono">348</span> 开 1/3 + <span class="mono">343.4</span> 补 1/6，财报前埋伏</li>
+              <li><b>PL（新开）</b>：<span class="mono">21.7</span> 开 1/3，支撑 21、破 <span class="mono">20.5</span> 止损；<span class="mono">23</span> 已出半</li>
+              <li><b>CONL</b>：<span class="mono">4.75</span> 半笔死拿 + <span class="mono">4.79</span> 回补；<b>CBRS</b> <span class="mono">165.5→174.4</span> 出半；<b>TSLL/DRAM</b> T仓已清</li>
+              <li><b>体系</b>：常规仓 1/3、1/6 分批；「市值理论100跌50」=（前高+低点）÷2 为一半位置，到位减半仓</li>
+            </ul>
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>胜率%</h2>
+      <span class="sub">验证一律由 Claude 用独立行情数据核实</span>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>提出日</th>
+            <th>大佬</th>
+            <th>判断（最新版本）</th>
+            <th>验证时点</th>
+            <th>状态（Claude 独立核实）</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="t">07/17</td>
+            <td><span class="guru-chip gA"><span class="gdot"></span>主任</span></td>
+            <td>「SPYU 留周末，下周看继续涨」</td>
+            <td class="t">下周美股</td>
+            <td><span class="pill verify-pending">⏳ 待验证（若周一开盘前改口，按新表态重记）</span></td>
+          </tr>
+          <tr>
+            <td class="t">07/17</td>
+            <td><span class="guru-chip gA"><span class="gdot"></span>主任</span></td>
+            <td>「若不反弹，SPX 下看 7300 / 7000」（条件判断）</td>
+            <td class="t">未来数周</td>
+            <td><span class="pill verify-pending">👀 观察中</span></td>
+          </tr>
+          <tr>
+            <td class="t">07/18</td>
+            <td><span class="guru-chip gB"><span class="gdot"></span>社长</span></td>
+            <td>「SMH 短期底部已现，GOOG 财报前有反弹」</td>
+            <td class="t">07/23 前</td>
+            <td><span class="pill verify-pending">⏳ 待验证</span> <span class="pill verify-diff">依据修正：他称 SMH 收盘高开盘 3%，实为 +1.57%</span></td>
+          </tr>
+          <tr>
+            <td class="t">07/18</td>
+            <td><span class="guru-chip gB"><span class="gdot"></span>社长</span></td>
+            <td>「AAPL 是最拥挤交易，后面要补跌 → 一鲸落万物生」</td>
+            <td class="t">未来数周</td>
+            <td><span class="pill verify-pending">👀 观察中</span></td>
+          </tr>
+          <tr>
+            <td class="t">07/07</td>
+            <td><span class="guru-chip gB"><span class="gdot"></span>社长</span></td>
+            <td>「韩国指数历史大顶已现，60%+ 概率技术性熊市」（07/18 上线杠杆监控跟踪）</td>
+            <td class="t">两个月内</td>
+            <td><span class="pill verify-pending">👀 观察中</span></td>
+          </tr>
+          <tr>
+            <td class="t">07/17</td>
+            <td><span class="guru-chip gC"><span class="gdot"></span>大胡</span></td>
+            <td>「周五开盘先压价走期权结算，然后回流资金进场」</td>
+            <td class="t">07/17 当日</td>
+            <td><span class="pill verify-ok">✅ 方向兑现：SPY/SMH 跳空低开后收高于开盘（+0.16% / +1.57%）；惟日线仍收跌，「普涨」打折</span></td>
+          </tr>
+          <tr>
+            <td class="t">07/17</td>
+            <td><span class="guru-chip gC"><span class="gdot"></span>大胡</span></td>
+            <td>「回流的资金还是在硬件」</td>
+            <td class="t">持续验证</td>
+            <td><span class="pill verify-pending">⏳ 初步支持：周五 SMH 较开盘 +1.57% vs SPY +0.16%，硬件相对强</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="winrate-grid">
+      <div class="tile">
+        <div class="k"><span class="guru-chip gA"><span class="gdot"></span>主任</span></div>
+        <div class="v mono">— %</div>
+        <div class="d">已判定 0 · 待验证 2</div>
+      </div>
+      <div class="tile">
+        <div class="k"><span class="guru-chip gB"><span class="gdot"></span>社长</span></div>
+        <div class="v mono">— %</div>
+        <div class="d">已判定 0 · 待验证 3 · 数据引用修正 1</div>
+      </div>
+      <div class="tile">
+        <div class="k"><span class="guru-chip gC"><span class="gdot"></span>大胡</span></div>
+        <div class="v mono">100%</div>
+        <div class="d">已判定 1 · 命中 1 · 样本极小仅供参考</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>消息流</h2>
+      <span class="sub">发帖时间为北京时间 · 新消息在上</span>
+    </div>
+    <div class="filters" id="filters">
+      <button class="fbtn active" data-fguru="all">全部</button>
+      <button class="fbtn" data-fguru="A"><span class="gdot bg-gA"></span>主任</button>
+      <button class="fbtn" data-fguru="C"><span class="gdot bg-gC"></span>大胡</button>
+      <span class="fcount" id="fcount"></span>
+    </div>
+
+    <div class="feed" id="feed">
+
+      <article class="msg" data-guru="C">
+        <div class="msg-rail bg-gC"></div>
+        <div class="msg-body">
+          <div class="msg-head">
+            <span class="guru-chip gC"><span class="gdot"></span>大胡 · 答群友选股逻辑</span>
+            <span class="msg-time">07/18 00:04</span>
+          </div>
+          <blockquote class="msg-orig">「pl 是新的股 航空板块 这轮没有选 rklb 之类就是火箭发射失败太多 pl 是火箭配件 火箭失败了又要买一份发射反而业绩不影响」</blockquote>
+        </div>
+      </article>
+
+      <article class="msg" data-guru="C">
+        <div class="msg-rail bg-gC"></div>
+        <div class="msg-body">
+          <div class="msg-head">
+            <span class="guru-chip gC"><span class="gdot"></span>大胡 · 教学（顺带怼人）</span>
+            <span class="msg-time">07/17 22:04</span>
+          </div>
+          <blockquote class="msg-orig">「今天都提前说了V点买股票走结算 普涨的意思 还在问啥是结算就是常识问题没记忆」</blockquote>
+        </div>
+      </article>
+
+      <article class="msg" data-guru="A">
+        <div class="msg-rail bg-gA"></div>
+        <div class="msg-body">
+          <div class="msg-head">
+            <span class="guru-chip gA"><span class="gdot"></span>主任 · 复盘教学</span>
+            <span class="msg-time">07/17 22:17–22:24（两条连发）</span>
+          </div>
+          <blockquote class="msg-orig">「同学们，牛不牛？我就问你！」
+「今天夜盘我一直安慰大家，老实说我心里也没多大的底气，但我依旧不能让你们失去希望。总结来说为什么你们会这么痛苦（因为你们不敬畏市场，忽视了大盘高位震荡行情还进行开仓个股，有利润不跑，舍不得走）（会买是徒弟，会卖是师傅，空仓才是大神）」</blockquote>
+        </div>
+      </article>
+
+      <article class="msg" data-guru="C">
+        <div class="msg-rail bg-gC"></div>
+        <div class="msg-body">
+          <div class="msg-head">
+            <span class="guru-chip gC"><span class="gdot"></span>大胡 · 盘前预告当日剧本</span>
+            <span class="msg-time">07/17 21:24</span>
+          </div>
+          <blockquote class="msg-orig">「今天周五 昨天尾盘强平的V很多说明很多期权要被结算 今天开盘也会下压下让剩下一批期权结算掉 然后让一些回流的资金入一部分」</blockquote>
+        </div>
+      </article>
+
+      <article class="msg" data-guru="C">
+        <div class="msg-rail bg-gC"></div>
+        <div class="msg-body">
+          <div class="msg-head">
+            <span class="guru-chip gC"><span class="gdot"></span>大胡 · 给群友讲急跌逻辑</span>
+            <span class="msg-time">07/17 18:40</span>
+          </div>
+          <blockquote class="msg-orig">「最近的急跌 属于回流太慢 特朗普一个让美股自己加速赶底部 一个自损自身估值 去引发A股港股更多的减持
+周二说过A股这个反弹是为了引发更大的减持而反弹的」</blockquote>
+        </div>
+      </article>
+
+      <article class="msg" data-guru="C">
+        <div class="msg-rail bg-gC"></div>
+        <div class="msg-body">
+          <div class="msg-head">
+            <span class="guru-chip gC"><span class="gdot"></span>大胡 · 边操作边讲逻辑</span>
+            <span class="msg-time">07/17 18:17</span>
+          </div>
+          <blockquote class="msg-orig">「861出剩下一半852.5的mu
+回流的资金还是在硬件 （特朗普故意压低2天的急跌给回流进场）异动出在找低买机会 或者急跌做正T」</blockquote>
+        </div>
+      </article>
+
+      <article class="msg" data-guru="C">
+        <div class="msg-rail bg-gC"></div>
+        <div class="msg-body">
+          <div class="msg-head">
+            <span class="guru-chip gC"><span class="gdot"></span>大胡 · 盘前答疑</span>
+            <span class="msg-time">07/17 16:55</span>
+          </div>
+          <blockquote class="msg-orig">「今天特朗普的讲话还是针对大陆的减持下杀 引发了A股港股更多的减持 代价也是七伤拳一样 以美股跌为代价去加速赶底和让更多的资金回流 满仓的仓位还有朝着美联储讲话后的那次针对回流和减持是否结束那次才去加
+今天还是只少量加1-2成摊平点昨天的那笔价格做反弹出为主」</blockquote>
+        </div>
+      </article>
+
+      <article class="msg" data-guru="A">
+        <div class="msg-rail bg-gA"></div>
+        <div class="msg-body">
+          <div class="msg-head">
+            <span class="guru-chip gA"><span class="gdot"></span>主任 · 安抚群友</span>
+            <span class="msg-time">07/17 16:00</span>
+          </div>
+          <blockquote class="msg-orig">「今天夜盘在骗炮，同学们淡定」</blockquote>
+        </div>
+      </article>
+
+      <div class="empty hidden" id="empty">没有符合当前筛选的消息</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>A股观察</h2>
+      <span class="sub">每日一更 · A股收盘后约一小时（北京 16:00 档）· 今日周六休市，沿用周五信息</span>
+    </div>
+    <div class="tldr">
+      <div class="tldr-item">
+        <span class="news-tag">情绪</span>
+        <div><p>「A股的专家开始唱空芯片了」—— 配合美股芯片熊市，A股芯片的情绪面也开始转冷。群友「特离谱」补刀：轮动是最坑散户的，根本追不上（群友观点，仅供参考）。<span class="attr">—— 社长 07/18</span></p></div>
+      </div>
+      <div class="tldr-item">
+        <span class="news-tag">结构</span>
+        <div><p>「A股这个反弹是为了引发更大的减持而反弹的」；特朗普讲话针对大陆减持下杀，引发 A股港股更多减持 —— <b>白话：他认为本轮A股反弹是诱多出货结构，追高需谨慎。</b><span class="attr">—— 大胡 07/14 预判 · 07/17 复述</span></p></div>
+      </div>
+      <div class="tldr-item">
+        <span class="news-tag">轮动</span>
+        <div><p>社长群群友「郑」：现在涨得好的影视、创新药也会补跌，资金会回到科技捡便宜货（群友观点，仅供参考）。<span class="attr">—— 社长群群友 07/18</span></p></div>
+      </div>
+      <div class="tldr-item">
+        <span class="news-tag">备注</span>
+        <div><p>大胡 Whop 的 A股频道自 2025 年 10 月起基本停更，群友称他极少做A股 —— A股内容以社长为主、大胡宏观点评为辅。<span class="attr">—— Claude 核查</span></p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="claude-thinking">
+    <div class="sec-head">
+      <h2>Claude 深度思考</h2>
+    </div>
+    <div class="think-card">
+      <p style="font-size: 15px; color: var(--ink); line-height: 1.9; margin: 0;">第 1 期 · 周一开盘前：我最明确的看涨信号是<b>芯片反弹，SMH 大概率跑赢大盘</b>（信心 7/10），个股首选 <b>MU 和 AVGO</b> —— 大胡真金白银低吸 + 机构仓位已出清到年内最低，是三位大佬与数据共振最强的方向；其次看好<b>医药 XLV 轮动延续</b>（上周创 2022 年以来最佳单周，我独立检索的盲区补充）和 <b>SPX 反弹尝试</b>，纳指跟随反弹但弹性不如 SMH，软件 IGV 中性偏多 —— 所有判断的前提是 <b>SPX 守住 7433</b>（周五日内低点），失守则全盘转防守。</p>
+    </div>
+    <div class="review-box">
+      <b>复盘区</b>（暂无记录）
+    </div>
+  </section>
+
+  <footer>
+    星引模型 Catalyst Capital · 本页为三位博主付费/公开群消息的自动整理与解读，仅供参考，不构成投资建议；大佬观点互相冲突时尤其注意 —— 冲突本身就是信息。杠杆产品（SPYU/TSLL/CONL/DRAM 等）波动剧烈，跟单风险自担。Claude 深度思考版块为 AI 分析实验，同样不构成投资建议。<br>
+    数据源：Discord「带单群」（主任） · 知识星球「社长说」（社长） · Whop「stock and option」（大胡） · 行情/日期/新闻核实：Yahoo Finance 与公开媒体独立检索 · 由 Claude 整理生成
+  </footer>
+
+</div>
+
+
+<div id="mascot" aria-hidden="true">
+  <div class="bubble" id="mascot-say">…</div>
+  <svg width="84" height="80" viewBox="0 0 84 80" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="30" cy="18" rx="9" ry="10" fill="#FFFDFA" stroke="#52483E" stroke-width="2.2"/>
+    <ellipse cx="54" cy="18" rx="9" ry="10" fill="#FFFDFA" stroke="#52483E" stroke-width="2.2"/>
+    <ellipse cx="30" cy="19" rx="4.5" ry="5.5" fill="#F9C9DC"/>
+    <ellipse cx="54" cy="19" rx="4.5" ry="5.5" fill="#F9C9DC"/>
+    <ellipse cx="42" cy="47" rx="30" ry="27" fill="#FFFDFA" stroke="#52483E" stroke-width="2.4"/>
+    <circle cx="24" cy="52" r="6" fill="#F9C9DC" opacity="0.85"/>
+    <circle cx="60" cy="52" r="6" fill="#F9C9DC" opacity="0.85"/>
+    <g id="m-eyes-open"><circle cx="32" cy="43" r="3.2" fill="#52483E"/><circle cx="52" cy="43" r="3.2" fill="#52483E"/></g>
+    <g id="m-eyes-happy" style="display:none"><path d="M28 44 Q32 39 36 44" stroke="#52483E" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M48 44 Q52 39 56 44" stroke="#52483E" stroke-width="2.4" fill="none" stroke-linecap="round"/></g>
+    <g id="m-eyes-sleep" style="display:none"><path d="M28 43 Q32 46 36 43" stroke="#52483E" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M48 43 Q52 46 56 43" stroke="#52483E" stroke-width="2.4" fill="none" stroke-linecap="round"/></g>
+    <path id="m-mouth-flat" d="M39 54 Q42 56 45 54" stroke="#52483E" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+    <path id="m-mouth-happy" style="display:none" d="M37 53 Q42 59 47 53" stroke="#52483E" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+    <path id="m-mouth-sad" style="display:none" d="M37 57 Q42 52 47 57" stroke="#52483E" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+    <path id="m-tear" style="display:none" d="M58 48 Q61 54 58 57 Q55 54 58 48" fill="#A8CFF0" stroke="#6FA8DC" stroke-width="1"/>
+    <text id="m-zzz" style="display:none" x="66" y="26" font-size="12" fill="#A5988A" font-weight="bold">zZ</text>
+  </svg>
+</div>
+
+<script>
+  (function () {
+    var state = { guru: "all" };
+    var cards = Array.prototype.slice.call(document.querySelectorAll("#feed .msg"));
+    var guruBtns = Array.prototype.slice.call(document.querySelectorAll("[data-fguru]"));
+    var countEl = document.getElementById("fcount");
+    var emptyEl = document.getElementById("empty");
+
+    function apply() {
+      var shown = 0;
+      cards.forEach(function (card) {
+        var ok = state.guru === "all" || card.getAttribute("data-guru") === state.guru;
+        card.classList.toggle("hidden", !ok);
+        if (ok) shown++;
+      });
+      countEl.textContent = shown + " / " + cards.length + " 条";
+      emptyEl.classList.toggle("hidden", shown !== 0);
+      guruBtns.forEach(function (b) {
+        b.classList.toggle("active", b.getAttribute("data-fguru") === state.guru);
+      });
+    }
+
+    guruBtns.forEach(function (b) {
+      b.addEventListener("click", function () {
+        state.guru = b.getAttribute("data-fguru");
+        apply();
+      });
+    });
+
+    apply();
+
+    // 盘面走势图：3月/1月/1周/1日 切换（数据 Yahoo Finance，截至周五收盘）
+    var CHART_DATA = {
+      spx: {
+        d3m: [7109.14,7064.01,7137.90,7108.40,7165.08,7173.91,7138.80,7135.95,7209.01,7230.12,7200.75,7259.22,7365.12,7337.11,7398.93,7412.84,7400.96,7444.25,7501.24,7408.50,7403.05,7353.61,7432.97,7445.72,7473.47,7519.12,7520.36,7563.63,7580.06,7599.96,7609.78,7553.68,7584.31,7383.74,7405.73,7386.65,7266.99,7394.30,7431.46,7554.29,7511.35,7420.10,7500.58,7472.79,7365.46,7358.22,7357.49,7354.02,7440.43,7499.36,7483.23,7483.24,7537.43,7503.85,7482.71,7543.64,7575.39,7515.34,7543.59,7572.40,7533.77,7457.69],
+        d1m: [7500.58,7472.79,7365.46,7358.22,7357.49,7354.02,7440.43,7499.36,7483.23,7483.24,7537.43,7503.85,7482.71,7543.64,7575.39,7515.34,7543.59,7572.40,7533.77,7457.69],
+        d1w: [7515.34,7543.59,7572.40,7533.77,7457.69],
+        d1d: [7433.63,7437.91,7434.08,7454.91,7464.97,7473.11,7477.56,7488.31,7489.02,7491.52,7493.93,7488.85,7485.66,7492.42,7484.19,7482.51,7478.37,7475.39,7467.41,7473.22,7468.54,7470.16,7467.77,7479.73,7475.65,7482.17,7479.84,7480.79,7486.29,7494.56,7480.26,7485.15,7488.88,7489.87,7478.49,7485.19,7481.93,7484.49,7488.84,7494.18,7495.03,7488.81,7492.56,7495.75,7489.96,7489.41,7488.68,7494.50,7492.21,7486.55,7481.81,7480.75,7475.30,7471.23,7472.30,7468.49,7466.67,7463.75,7462.93,7462.24,7462.36,7462.76,7458.44,7464.55,7470.95,7469.81,7464.01,7459.45,7452.46,7454.26,7448.65,7456.63,7455.36,7453.86,7460.37,7465.43,7465.59,7457.78,7457.69]
+      },
+      ixic: {
+        d3m: [24404.39,24259.96,24657.57,24438.50,24836.60,24887.10,24663.80,24673.24,24892.31,25114.44,25067.80,25326.13,25838.94,25806.20,26247.08,26274.13,26088.20,26402.34,26635.22,26225.14,26090.73,25870.71,26270.36,26293.10,26343.97,26656.18,26674.73,26917.47,26972.62,27086.81,27093.90,26853.98,26830.96,25709.43,25929.66,25678.82,25169.50,25809.66,25888.84,26683.94,26376.34,26021.66,26517.93,26166.60,25587.04,25476.64,25358.60,25297.62,25820.14,26213.72,26040.03,25832.67,26121.16,25818.69,25870.65,26206.89,26281.61,25873.18,26107.01,26269.23,25881.95,25520.24],
+        d1m: [26517.93,26166.60,25587.04,25476.64,25358.60,25297.62,25820.14,26213.72,26040.03,25832.67,26121.16,25818.69,25870.65,26206.89,26281.61,25873.18,26107.01,26269.23,25881.95,25520.24],
+        d1w: [25873.18,26107.01,26269.23,25881.95,25520.24],
+        d1d: [25359.70,25303.80,25254.71,25315.88,25397.54,25444.83,25484.66,25546.31,25546.99,25574.05,25585.22,25551.59,25543.14,25596.19,25555.19,25535.99,25509.91,25480.19,25450.82,25477.98,25463.88,25474.60,25450.88,25515.91,25505.44,25546.29,25530.26,25544.78,25578.37,25611.19,25559.10,25584.99,25604.65,25623.07,25561.77,25606.35,25599.21,25613.93,25640.69,25670.82,25688.02,25656.06,25684.07,25698.03,25669.18,25671.35,25661.51,25698.06,25681.82,25656.63,25632.32,25633.65,25610.81,25596.12,25603.44,25570.75,25563.89,25549.16,25551.54,25554.60,25548.92,25545.48,25530.49,25564.46,25587.93,25581.06,25573.56,25541.03,25500.04,25505.39,25478.92,25521.65,25522.11,25501.36,25529.05,25550.17,25563.71,25519.48,25520.24]
+      }
+    };
+    var RANGE_NAMES = { d3m: "3个月", d1m: "1个月", d1w: "1周", d1d: "日内" };
+
+    function renderChart(chartId, range) {
+      var arr = CHART_DATA[chartId][range];
+      var svg = document.getElementById("chart-" + chartId);
+      var line = svg.querySelector(".spark-line");
+      var dot = svg.querySelector(".spark-dot");
+      var min = Math.min.apply(null, arr);
+      var max = Math.max.apply(null, arr);
+      var span = (max - min) || 1;
+      var n = arr.length;
+      var pts = [];
+      var lastX = 0, lastY = 0;
+      for (var i = 0; i < n; i++) {
+        var x = 4 + (i / (n - 1)) * 252;
+        var y = 4 + ((max - arr[i]) / span) * 56;
+        pts.push(x.toFixed(1) + "," + y.toFixed(1));
+        lastX = x; lastY = y;
+      }
+      line.setAttribute("points", pts.join(" "));
+      dot.setAttribute("cx", lastX.toFixed(1));
+      dot.setAttribute("cy", lastY.toFixed(1));
+      var chg = (arr[n - 1] - arr[0]) / arr[0] * 100;
+      var cls = chg < 0 ? "delta-down" : "delta-up";
+      var sign = chg < 0 ? "−" : "+";
+      dot.style.fill = chg < 0 ? "var(--bear)" : "var(--bull)";
+      document.getElementById("delta-" + chartId).innerHTML =
+        '<span class="' + cls + '">' + RANGE_NAMES[range] + " " + sign + Math.abs(chg).toFixed(2) + "%</span>";
+    }
+
+    Array.prototype.slice.call(document.querySelectorAll(".range-btns")).forEach(function (group) {
+      var chartId = group.getAttribute("data-chart");
+      Array.prototype.slice.call(group.querySelectorAll("button")).forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          group.querySelectorAll("button").forEach(function (b) { b.classList.remove("active"); });
+          btn.classList.add("active");
+          renderChart(chartId, btn.getAttribute("data-range"));
+        });
+      });
+    });
+    renderChart("spx", "d1m");
+    renderChart("ixic", "d1m");
+
+    // 小吧唔：看盘变脸
+    (function(){
+      var say = document.getElementById("mascot-say");
+      function show(id, on){ var el = document.getElementById(id); if (el) el.style.display = on ? "" : "none"; }
+      var d = new Date();
+      var wk = d.getDay();
+      var arr = CHART_DATA.spx.d1m;
+      var chg = (arr[arr.length-1] - arr[arr.length-2]) / arr[arr.length-2] * 100;
+      var mood, text;
+      if (wk === 0 || wk === 6) { mood = "sleep"; text = "休市中～躺平充电 zZ"; }
+      else if (chg <= -1) { mood = "cry"; text = "大盘在挖坑…主任说要淡定！"; }
+      else if (chg < -0.2) { mood = "flat"; text = "有点晃，抱紧小板凳…"; }
+      else if (chg < 0.2) { mood = "flat"; text = "安静的盘面，嗑瓜子中"; }
+      else if (chg < 1) { mood = "happy"; text = "诶嘿，回血了一点点！"; }
+      else { mood = "happy"; text = "冲鸭！！小钱钱回来了！"; }
+      show("m-eyes-open", mood === "flat" || mood === "cry");
+      show("m-eyes-happy", mood === "happy");
+      show("m-eyes-sleep", mood === "sleep");
+      show("m-mouth-flat", mood === "flat" || mood === "sleep");
+      show("m-mouth-happy", mood === "happy");
+      show("m-mouth-sad", mood === "cry");
+      show("m-tear", mood === "cry");
+      show("m-zzz", mood === "sleep");
+      say.textContent = text;
+    })();
+
+    Array.prototype.slice.call(document.querySelectorAll(".cd[data-evt-date]")).forEach(function (el) {
+      var start = new Date(el.getAttribute("data-evt-date"));
+      var endAttr = el.getAttribute("data-evt-end");
+      var end = endAttr ? new Date(endAttr) : new Date(start.getTime() + 86399000);
+      var now = new Date();
+      var days = Math.ceil((start - now) / 86400000);
+      if (now > end) {
+        el.textContent = "已过";
+      } else if (now >= start) {
+        el.textContent = endAttr ? "进行中" : "今天";
+        el.classList.add("today");
+      } else if (days <= 1) {
+        el.textContent = "明天";
+        el.classList.add("today");
+      } else {
+        el.textContent = "还有 " + days + " 天";
+      }
+    });
+  })();
+</script>
