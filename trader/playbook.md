@@ -66,7 +66,7 @@ E. 空仓也是仓位：没有优势时持币，别为交易而交易。
   - 社长说 wx.zsxq.com/group/15555452148452 —— 社长，机构级研究、每日 20 只热门美股、周末「下周机会方向」。
   - **华尔街之狼 wx.zsxq.com/group/88888158545522 —— 就是主任**（星主账号「华尔街之柴犬」，原 DANIEL TANG INVESTMENT LAB 改名），每天发标普点位卡（压力/支撑）、伽马正负、日线预测、SOXX 目标；用户已退订他的 Discord 付费群（他新群 Discord ID meigushiyanshi，月费 365，不跟）。
   - 好奇先生财富圈 wx.zsxq.com/group/48888125851248 —— 第四位，偏基本面白话（NVDA/MU/TSLA/AAPL），有回测式观点；**用户会员 2026-09-21 到期**。
-- 大胡 Whop（whop.com/joined/stock-and-option/-GiWyN1ZTuUjwlG/app/ 等，slug 见记忆）：网页需邮箱验证码登录（待用户登录）；桌面 app 已登录但跨 Space 无法后台点击。
+- **大胡 Whop（2026-09-05 网页已登录、订阅有效）**：内置浏览器 navigate 后等 6 秒 get_page_text 直读。频道 URL 前缀 whop.com/joined/stock-and-option/{slug}/app/：主频道「不用翻墙美股发布」= -GiWyN1ZTuUjwlG（每笔做T实盘：「X出一半Y的股票」= 以 X 价卖出一半成本 Y 的仓位）；期权 = -gZyq1MzOZAWO98（2026-04 起休眠）；讨论区股票记录 = -YaUGmSLziDBKaw（纯截图）；新闻 = -RCmV4WDjEOJcFF；100跌50 公式 = 100-50-B3kT9y4dyQGpgy；美股讨论区 = -9vfxZgBNgXykNt。他的风格：急跌接、N 字反弹、分批出一半、盯大单；常用杠杆 ETF（SOXL/DRAM/CONL/TSLL）。
 - 主任 Discord：已退订，不再读。
 
 ## 7. 时间表（Mac 本地时区 = 美西 PT；北京 = PT+15h，**11/1 美国退出夏令时后 = PT+16h，届时须改 cron**）
@@ -89,7 +89,8 @@ E. 空仓也是仓位：没有优势时持币，别为交易而交易。
 - 2026-07（继承）：社长称 SMH 收高开盘 3%，实核 +1.57%——任何数字先自己用行情复算。
 
 ## 9. 待办
-- [ ] 9/7 深度研究 + 首份作战计划（一次性任务）
+- [x] Whop 网页登录（用户 9/5 完成，订阅有效）
+- [ ] 9/7 深度研究 + 首份作战计划（一次性任务，已排定）
 - [ ] 验证 CPI 具体日期（BLS 表里 8 月 CPI 发布日未列出，搜索说 9/11）
 - [ ] 把 trader/index.html 挂到 GitHub Pages（catalyst-site/trader/index.html），并让星引模型看板链接过来
 - [ ] 11/1 前改 A股 cron（夏令时结束）
