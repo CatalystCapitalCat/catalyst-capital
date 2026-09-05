@@ -1,5 +1,5 @@
 # Claude 交易员 · 作战手册（playbook）
-版本 v1.2 · 2026-09-05 建立（v1.1 X 博主通道；v1.2 美股账本切换到 Alpaca 模拟盘，见第 1b 节） · 每次复盘后修订并递增版本号。**每次醒来先读本文件，再读账本，再看行情，最后才动手。**
+版本 v1.3 · 2026-09-05 建立（v1.1 X 博主通道；v1.2 美股账本切换 Alpaca；v1.3 信源重组：主任改从知识星球读、新增好奇先生） · 每次复盘后修订并递增版本号。**每次醒来先读本文件，再读账本，再看行情，最后才动手。**
 
 ## 0. 任命与目标（用户 2026-09-05 定）
 - 身份：自主学习的模拟盘交易员。用户每天看交易、看总结；我每天写总结巩固。
@@ -62,7 +62,12 @@ E. 空仓也是仓位：没有优势时持币，别为交易而交易。
 - A股：雪球热帖 JSON（xueqiu.com/statuses/hot/listV2.json）、集思录 jisilu.cn、新浪财经；财联社电报超时。
 - **X/Twitter（2026-09-05 打通）**：用户已在内置浏览器面板登录 x.com（账号 @buliuyihanchong）。读法：navigate 主页 → 等 6 秒 → 滚一屏 → get_page_text；博主清单与信用分在 `research/x-watchlist.md`。定时任务是新会话，登录态可能不共享：先开 x.com/home 验证，是登录框就改用 WebSearch 并向用户报告「X 登录态丢失」。x.com 用 curl/WebFetch 读不了（402）。
 - 读不了：reddit、stocktwits API、bloomberg、FT、investing.com。SEC EDGAR 需要带联系邮箱的 UA。
-- 三大佬（主任 Discord / 社长知识星球 / 大胡 Whop）：需要内置浏览器登录态，仅在主会话可用，作为参考信源之一。
+- **知识星球三个群（2026-09-05 用户定：都跟踪）**，内置浏览器已登录（登录态丢了请用户微信扫码），读法 navigate 到 URL → 等 5 秒 → get_page_text（API 已被官方封，只能读页面）：
+  - 社长说 wx.zsxq.com/group/15555452148452 —— 社长，机构级研究、每日 20 只热门美股、周末「下周机会方向」。
+  - **华尔街之狼 wx.zsxq.com/group/88888158545522 —— 就是主任**（星主账号「华尔街之柴犬」，原 DANIEL TANG INVESTMENT LAB 改名），每天发标普点位卡（压力/支撑）、伽马正负、日线预测、SOXX 目标；用户已退订他的 Discord 付费群（他新群 Discord ID meigushiyanshi，月费 365，不跟）。
+  - 好奇先生财富圈 wx.zsxq.com/group/48888125851248 —— 第四位，偏基本面白话（NVDA/MU/TSLA/AAPL），有回测式观点；**用户会员 2026-09-21 到期**。
+- 大胡 Whop（whop.com/joined/stock-and-option/-GiWyN1ZTuUjwlG/app/ 等，slug 见记忆）：网页需邮箱验证码登录（待用户登录）；桌面 app 已登录但跨 Space 无法后台点击。
+- 主任 Discord：已退订，不再读。
 
 ## 7. 时间表（Mac 本地时区 = 美西 PT；北京 = PT+15h，**11/1 美国退出夏令时后 = PT+16h，届时须改 cron**）
 - 美股（周一至周五）：盘前 05:30 PT｜盘中 06:35 起每小时到 12:35｜盘后 13:15 PT 写日报。
