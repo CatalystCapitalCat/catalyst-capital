@@ -1,5 +1,5 @@
 # Claude 交易员 · 作战手册（playbook）
-版本 v1.0 · 2026-09-05 建立 · 每次复盘后修订并递增版本号。**每次醒来先读本文件，再读账本，再看行情，最后才动手。**
+版本 v1.1 · 2026-09-05 建立（v1.1：X 博主通道打通，见第 6 节） · 每次复盘后修订并递增版本号。**每次醒来先读本文件，再读账本，再看行情，最后才动手。**
 
 ## 0. 任命与目标（用户 2026-09-05 定）
 - 身份：自主学习的模拟盘交易员。用户每天看交易、看总结；我每天写总结巩固。
@@ -50,7 +50,7 @@ E. 空仓也是仓位：没有优势时持币，别为交易而交易。
 - 宏观：federalreserve.gov（FOMC 日历/纪要）、bls.gov（WebFetch 可读，curl 403）、Yahoo 财报日历（finance.yahoo.com/calendar/earnings）。
 - 个股数据：stockanalysis.com、tradingview.com/symbols/…（页面可读）。
 - A股：雪球热帖 JSON（xueqiu.com/statuses/hot/listV2.json）、集思录 jisilu.cn、新浪财经；财联社电报超时。
-- X/Twitter：x.com 直接读不了（402）；nitter.net 可通（内容待验证）；重要博主观点也可通过 WebSearch 间接获得。用户已授权：需要什么软件/权限可以向用户申请。
+- **X/Twitter（2026-09-05 打通）**：用户已在内置浏览器面板登录 x.com（账号 @buliuyihanchong）。读法：navigate 主页 → 等 6 秒 → 滚一屏 → get_page_text；博主清单与信用分在 `research/x-watchlist.md`。定时任务是新会话，登录态可能不共享：先开 x.com/home 验证，是登录框就改用 WebSearch 并向用户报告「X 登录态丢失」。x.com 用 curl/WebFetch 读不了（402）。
 - 读不了：reddit、stocktwits API、bloomberg、FT、investing.com。SEC EDGAR 需要带联系邮箱的 UA。
 - 三大佬（主任 Discord / 社长知识星球 / 大胡 Whop）：需要内置浏览器登录态，仅在主会话可用，作为参考信源之一。
 
@@ -70,4 +70,5 @@ E. 空仓也是仓位：没有优势时持币，别为交易而交易。
 - [ ] 验证 CPI 具体日期（BLS 表里 8 月 CPI 发布日未列出，搜索说 9/11）
 - [ ] 把 trader/index.html 挂到 GitHub Pages（catalyst-site/trader/index.html），并让星引模型看板链接过来
 - [ ] 11/1 前改 A股 cron（夏令时结束）
-- [ ] 找到稳定读 X 博主的办法（nitter 或用户 Chrome 登录态）
+- [x] X 博主：内置浏览器登录态可读（2026-09-05）；待验证定时任务会话能否复用登录态
+- [ ] **美股账本切换到 Alpaca 模拟盘**（用户 9/5 要求正规平台；等用户注册并把 paper 密钥放到 ~/.alpaca_paper.env 后，写 alpaca.py 适配器、更新各任务提示词、engine 降级为审计账本；A股继续用 engine）
