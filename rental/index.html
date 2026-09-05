@@ -1,78 +1,125 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>房源展示 · 户型与房间图</title>
+<!doctype html><html lang='zh-CN'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>石梯红陶居</title></head><body>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600&family=Noto+Sans+SC:wght@400;500&display=swap">
 <style>
-:root{--bg:#faf8f4;--ink:#1f1d1a;--muted:#6b665f;--card:#fff;--line:#e6e1d8;--accent:#8a6d3b}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:"PingFang SC","Microsoft YaHei","Noto Sans CJK SC","WenQuanYi Zen Hei",sans-serif;line-height:1.6}
-header{padding:40px 24px 16px;max-width:1100px;margin:0 auto}h1{font-size:30px;margin:0 0 6px}header p{color:var(--muted);margin:0}
-main{max-width:1100px;margin:0 auto;padding:0 24px 60px}
-section{margin:36px 0}h2{font-size:22px;margin:0 0 6px;border-left:5px solid var(--accent);padding-left:12px}
-.lead{color:var(--muted);margin:0 0 14px}
-.plan{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
-.plan img{width:100%;height:auto;display:block;border-radius:8px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
-figure{margin:0;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+:root{--ground:#F5F2EC;--ink:#2B2621;--muted:#746A5E;--accent:#B5623A;--line:#DDD4C6;--card:#FFFFFF;--tint:#F0E8DC;--warn-bg:#FBF1E6;--warn-ink:#7A4A2A}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--ground:#1E1B18;--ink:#ECE6DC;--muted:#A89E92;--accent:#D07B52;--line:#3A342E;--card:#262220;--tint:#2E2823;--warn-bg:#332A22;--warn-ink:#E8C9B0}}
+:root[data-theme="dark"]{--ground:#1E1B18;--ink:#ECE6DC;--muted:#A89E92;--accent:#D07B52;--line:#3A342E;--card:#262220;--tint:#2E2823;--warn-bg:#332A22;--warn-ink:#E8C9B0}
+*{box-sizing:border-box}html{color-scheme:light dark}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:"Noto Sans SC","PingFang SC","Microsoft YaHei","WenQuanYi Zen Hei",sans-serif;font-size:16px;line-height:1.7}
+h1,h2,h3{font-family:"Noto Serif SC","Songti SC","SimSun",serif;font-weight:600;text-wrap:balance;margin:0}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+header{padding:48px 0 28px;border-bottom:1px solid var(--line)}
+.eyebrow{font-size:12px;letter-spacing:.18em;color:var(--accent);text-transform:uppercase;margin-bottom:10px}
+h1{font-size:40px;line-height:1.2}
+.intro{max-width:34em;color:var(--muted);margin:14px 0 18px}
+.facts{display:flex;flex-wrap:wrap;gap:8px 22px;font-size:14px;color:var(--muted)}
+.facts b{color:var(--ink);font-family:"Noto Serif SC",serif;font-size:20px;margin-right:4px;font-variant-numeric:tabular-nums}
+section{padding:40px 0;border-bottom:1px solid var(--line)}
+section:last-of-type{border-bottom:0}
+h2{font-size:26px;margin-bottom:8px}
+h2 small{font-family:"Noto Sans SC",sans-serif;font-size:12px;letter-spacing:.18em;color:var(--accent);display:block;margin-bottom:6px;font-weight:500}
+.plan{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:10px;margin-top:16px}
+.plan img{width:100%;height:auto;display:block;border-radius:4px}
+.caption{font-size:13px;color:var(--muted);margin-top:10px;max-width:60em}
+.index{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.index a{font-size:13px;color:var(--ink);text-decoration:none;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 14px}
+.index a:hover,.index a:focus-visible{border-color:var(--accent);outline:none}
+.index a i{font-style:normal;color:var(--accent);font-family:"Noto Serif SC",serif;margin-right:6px}
+.room{display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:28px;align-items:start}
+.room .txt{position:sticky;top:20px}
+.room h3{font-size:24px}
+.room .step{font-size:12px;letter-spacing:.18em;color:var(--accent);margin-bottom:6px}
+.room .sub{font-size:13px;color:var(--muted);margin-bottom:10px}
+.room p{margin:0 0 12px;font-size:15px}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.tags span{font-size:12px;background:var(--tint);color:var(--ink);border-radius:4px;padding:3px 9px}
+.warn{font-size:13px;background:var(--warn-bg);color:var(--warn-ink);border-left:3px solid var(--accent);padding:8px 12px;border-radius:0 4px 4px 0}
+.shots{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+figure{margin:0;background:var(--card);border:1px solid var(--line);border-radius:6px;overflow:hidden}
 figure img{width:100%;aspect-ratio:478/850;object-fit:cover;display:block}
-figcaption{padding:10px 12px;font-size:14px}figcaption span{color:var(--muted);font-size:12px;float:right}
-.summary{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
-.summary div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
-.summary b{display:block;font-size:16px;margin-bottom:4px}.summary small{color:var(--muted)}
-.note{background:#fff8e6;border:1px solid #f0dfae;border-radius:10px;padding:12px 16px;font-size:14px;color:#5a4a1e}
-footer{max-width:1100px;margin:0 auto;padding:0 24px 40px;color:var(--muted);font-size:13px}
-a{color:var(--accent)}
-</style></head><body>
-<header><h1>房源展示 · 户型与房间图</h1><p>楼上一层整层 · 一层独立楼梯入口 · 卧室 1 · 客厅 1 · 大厅 1 · 厨房 · 卫生间 · 后厅</p></header>
-<main>
-<section><h2>户型示意图</h2><p class="lead">根据看房视频行走顺序推断，墙体尺寸和面积为目测估算，仅供示意。<a href="floorplan.svg">下载可编辑 SVG</a></p>
-<div class="plan"><img src="floorplan.png" alt="户型示意图"></div></section>
-<section><h2>房间一览</h2><div class="summary">
-<div><b>入口楼梯间</b><small>一层独立入口，红陶地砖门厅，石材楼梯配木质扶手和磨砂玻璃护板；先上 3 级到小平台，再转向上到楼上。楼梯顶端有采光窗。</small></div>
-<div><b>楼梯口与走廊</b><small>楼上楼梯口有两扇窗，红陶地砖。走廊沿楼梯半墙护栏通向厨房门，途中有门洞通大厅，尽头右侧是客厅门。</small></div>
-<div><b>厨房</b><small>双开窗配蓝色窗帘，窗下有燃气取暖器。靠墙吊柜、白瓷砖灶台墙面，抽油烟机位已预留（现贴着报纸）。红陶地砖。另有一扇未开启的门。</small></div>
-<div><b>客厅</b><small>两扇窗，配吊灯与取暖器，白色瓷砖地面。现有沙发、小桌和椅子。有一扇未开启的木门，推测通厨房。</small></div>
-<div><b>大厅</b><small>面积最大的一间，白色瓷砖地面，两扇窗配深色窗帘，两盏吊灯，靠墙置物架。有两个门洞分别通楼梯口和门厅，北墙木门通后厅。</small></div>
-<div><b>后厅</b><small>大厅北墙木门之后的小空间，浅色瓷砖，现堆放清洁工具。另一侧还有一个门洞，视频中未拍到去向。</small></div>
-<div><b>卫生间</b><small>白瓷砖到顶，马桶、坐浴盆、立柱洗手盆齐全，配电热水器。有窗（现用布遮挡），有晾衣架。</small></div>
-<div><b>卧室</b><small>现有两张单人床、书桌椅和床头柜，木窗配百叶卷帘，一侧有衣柜。墙面有明显水渍霉斑，建议出租前处理。</small></div>
+figcaption{padding:8px 10px;font-size:13px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+figcaption span{color:var(--muted);font-size:11px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.status{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:16px}
+.status div{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:12px 14px;font-size:14px}
+.status b{display:block;font-family:"Noto Serif SC",serif;font-size:16px;margin-bottom:4px}
+footer{padding:28px 0 48px;color:var(--muted);font-size:13px}
+@media (max-width:720px){.room{grid-template-columns:1fr}.room .txt{position:static}h1{font-size:32px}}
+@media (prefers-reduced-motion:no-preference){a{transition:border-color .15s}}
+</style>
+<header><div class="wrap"><div class="eyebrow">出租 · 楼上整层</div><h1>石梯红陶居</h1>
+<p class="intro">一层独立石材楼梯上楼，整层自用。红陶地砖的楼梯口连起厨房、客厅和一间三十多平米的大厅，卧室与卫生间在大厅另一端的过道里。下面的户型图与照片全部来自看房视频。</p>
+<div class="facts"><span><b>1</b>卧室</span><span><b>1</b>客厅</span><span><b>1</b>大厅</span><span><b>1</b>厨房</span><span><b>1</b>卫生间</span><span><b>12</b>扇窗</span><span><b>独立</b>楼梯入口</span></div></div></header>
+<main class="wrap">
+<section id="plan"><h2><small>户型</small>户型示意图</h2>
+<div class="plan"><img src="floorplan.png" alt="户型示意图"></div>
+<p class="caption">房间连接关系由看房视频三维重建并逐帧核对：楼梯口左转即门洞D进大厅；走廊尽头正前方厨房、右侧客厅；大厅另一端门C通小过道，卫生间与卧室都从过道进。墙体尺寸、面积、真实朝向未实测，仅供示意。</p></section>
+<section id="rooms"><h2><small>看房路线</small>按视频顺序逐间看</h2><div class="index">
+<a href="#r01"><i>1</i>入口楼梯间</a>
+<a href="#r02"><i>2</i>楼梯口与走廊</a>
+<a href="#r03"><i>3</i>厨房</a>
+<a href="#r04"><i>4</i>客厅</a>
+<a href="#r05"><i>5</i>大厅</a>
+<a href="#r06"><i>6</i>过道</a>
+<a href="#r07"><i>7</i>卫生间</a>
+<a href="#r08"><i>8</i>卧室</a>
 </div></section>
-<section id="r01"><h2>入口楼梯间</h2><p class="lead">一层独立入口，红陶地砖门厅，石材楼梯配木质扶手和磨砂玻璃护板；先上 3 级到小平台，再转向上到楼上。楼梯顶端有采光窗。</p><div class="grid">
-<figure><a href="stills/01_1_入口楼梯间.jpg"><img src="stills/01_1_入口楼梯间.jpg" alt="入口楼梯间 一层入口，石材楼梯" loading="lazy"></a><figcaption>一层入口，石材楼梯<span>视频 0:01</span></figcaption></figure>
-<figure><a href="stills/01_2_入口楼梯间.jpg"><img src="stills/01_2_入口楼梯间.jpg" alt="入口楼梯间 楼梯与木质扶手，尽头有窗" loading="lazy"></a><figcaption>楼梯与木质扶手，尽头有窗<span>视频 0:14</span></figcaption></figure>
-<figure><a href="stills/01_3_入口楼梯间.jpg"><img src="stills/01_3_入口楼梯间.jpg" alt="入口楼梯间 楼梯顶端平台，采光窗" loading="lazy"></a><figcaption>楼梯顶端平台，采光窗<span>视频 0:18</span></figcaption></figure>
-</div></section>
-<section id="r02"><h2>楼梯口与走廊</h2><p class="lead">楼上楼梯口有两扇窗，红陶地砖。走廊沿楼梯半墙护栏通向厨房门，途中有门洞通大厅，尽头右侧是客厅门。</p><div class="grid">
-<figure><a href="stills/02_1_楼梯口与走廊.jpg"><img src="stills/02_1_楼梯口与走廊.jpg" alt="楼梯口与走廊 楼梯口的窗，红陶地砖" loading="lazy"></a><figcaption>楼梯口的窗，红陶地砖<span>视频 0:21</span></figcaption></figure>
-<figure><a href="stills/02_2_楼梯口与走廊.jpg"><img src="stills/02_2_楼梯口与走廊.jpg" alt="楼梯口与走廊 走廊尽头是厨房门，左侧楼梯护栏" loading="lazy"></a><figcaption>走廊尽头是厨房门，左侧楼梯护栏<span>视频 0:28</span></figcaption></figure>
-<figure><a href="stills/02_3_楼梯口与走廊.jpg"><img src="stills/02_3_楼梯口与走廊.jpg" alt="楼梯口与走廊 走廊侧门望向大厅" loading="lazy"></a><figcaption>走廊侧门望向大厅<span>视频 0:24</span></figcaption></figure>
-</div></section>
-<section id="r03"><h2>厨房</h2><p class="lead">双开窗配蓝色窗帘，窗下有燃气取暖器。靠墙吊柜、白瓷砖灶台墙面，抽油烟机位已预留（现贴着报纸）。红陶地砖。另有一扇未开启的门。</p><div class="grid">
-<figure><a href="stills/03_1_厨房.jpg"><img src="stills/03_1_厨房.jpg" alt="厨房 双开窗配蓝色窗帘，窗下燃气取暖器" loading="lazy"></a><figcaption>双开窗配蓝色窗帘，窗下燃气取暖器<span>视频 0:42</span></figcaption></figure>
-<figure><a href="stills/03_2_厨房.jpg"><img src="stills/03_2_厨房.jpg" alt="厨房 厨房全景，餐椅" loading="lazy"></a><figcaption>厨房全景，餐椅<span>视频 0:40</span></figcaption></figure>
-<figure><a href="stills/03_3_厨房.jpg"><img src="stills/03_3_厨房.jpg" alt="厨房 灶台墙面白瓷砖，抽油烟机位置" loading="lazy"></a><figcaption>灶台墙面白瓷砖，抽油烟机位置<span>视频 0:34</span></figcaption></figure>
-<figure><a href="stills/03_4_厨房.jpg"><img src="stills/03_4_厨房.jpg" alt="厨房 吊柜" loading="lazy"></a><figcaption>吊柜<span>视频 0:36</span></figcaption></figure>
-</div></section>
-<section id="r04"><h2>客厅</h2><p class="lead">两扇窗，配吊灯与取暖器，白色瓷砖地面。现有沙发、小桌和椅子。有一扇未开启的木门，推测通厨房。</p><div class="grid">
-<figure><a href="stills/04_1_客厅.jpg"><img src="stills/04_1_客厅.jpg" alt="客厅 两扇窗与吊灯" loading="lazy"></a><figcaption>两扇窗与吊灯<span>视频 0:52</span></figcaption></figure>
-<figure><a href="stills/04_2_客厅.jpg"><img src="stills/04_2_客厅.jpg" alt="客厅 入门视角，沙发与通厨房方向的门" loading="lazy"></a><figcaption>入门视角，沙发与通厨房方向的门<span>视频 0:47</span></figcaption></figure>
-<figure><a href="stills/04_3_客厅.jpg"><img src="stills/04_3_客厅.jpg" alt="客厅 窗边与取暖器" loading="lazy"></a><figcaption>窗边与取暖器<span>视频 0:50</span></figcaption></figure>
-</div></section>
-<section id="r05"><h2>大厅</h2><p class="lead">面积最大的一间，白色瓷砖地面，两扇窗配深色窗帘，两盏吊灯，靠墙置物架。有两个门洞分别通楼梯口和门厅，北墙木门通后厅。</p><div class="grid">
-<figure><a href="stills/05_1_大厅.jpg"><img src="stills/05_1_大厅.jpg" alt="大厅 大厅全景，尽头的门通后厅" loading="lazy"></a><figcaption>大厅全景，尽头的门通后厅<span>视频 1:14</span></figcaption></figure>
-<figure><a href="stills/05_2_大厅.jpg"><img src="stills/05_2_大厅.jpg" alt="大厅 两扇窗与吊灯" loading="lazy"></a><figcaption>两扇窗与吊灯<span>视频 1:02</span></figcaption></figure>
-<figure><a href="stills/05_3_大厅.jpg"><img src="stills/05_3_大厅.jpg" alt="大厅 大厅另一侧" loading="lazy"></a><figcaption>大厅另一侧<span>视频 1:13</span></figcaption></figure>
-</div></section>
-<section id="r06"><h2>后厅</h2><p class="lead">大厅北墙木门之后的小空间，浅色瓷砖，现堆放清洁工具。另一侧还有一个门洞，视频中未拍到去向。</p><div class="grid">
-<figure><a href="stills/06_1_后厅.jpg"><img src="stills/06_1_后厅.jpg" alt="后厅 后厅内部，另有门洞" loading="lazy"></a><figcaption>后厅内部，另有门洞<span>视频 1:11</span></figcaption></figure>
-<figure><a href="stills/06_2_后厅.jpg"><img src="stills/06_2_后厅.jpg" alt="后厅 从大厅望向后厅" loading="lazy"></a><figcaption>从大厅望向后厅<span>视频 1:09</span></figcaption></figure>
-</div></section>
-<section id="r07"><h2>卫生间</h2><p class="lead">白瓷砖到顶，马桶、坐浴盆、立柱洗手盆齐全，配电热水器。有窗（现用布遮挡），有晾衣架。</p><div class="grid">
-<figure><a href="stills/07_1_卫生间.jpg"><img src="stills/07_1_卫生间.jpg" alt="卫生间 马桶、坐浴盆与电热水器" loading="lazy"></a><figcaption>马桶、坐浴盆与电热水器<span>视频 1:16</span></figcaption></figure>
-<figure><a href="stills/07_2_卫生间.jpg"><img src="stills/07_2_卫生间.jpg" alt="卫生间 洗手盆与窗" loading="lazy"></a><figcaption>洗手盆与窗<span>视频 1:23</span></figcaption></figure>
-<figure><a href="stills/07_3_卫生间.jpg"><img src="stills/07_3_卫生间.jpg" alt="卫生间 窗与晾衣架" loading="lazy"></a><figcaption>窗与晾衣架<span>视频 1:19</span></figcaption></figure>
-</div></section>
-<section id="r08"><h2>卧室</h2><p class="lead">现有两张单人床、书桌椅和床头柜，木窗配百叶卷帘，一侧有衣柜。墙面有明显水渍霉斑，建议出租前处理。</p><div class="grid">
-<figure><a href="stills/08_1_卧室.jpg"><img src="stills/08_1_卧室.jpg" alt="卧室 单人床、书桌椅与窗" loading="lazy"></a><figcaption>单人床、书桌椅与窗<span>视频 1:31</span></figcaption></figure>
-<figure><a href="stills/08_2_卧室.jpg"><img src="stills/08_2_卧室.jpg" alt="卧室 卧室另一角度" loading="lazy"></a><figcaption>卧室另一角度<span>视频 1:32</span></figcaption></figure>
-<figure><a href="stills/08_3_卧室.jpg"><img src="stills/08_3_卧室.jpg" alt="卧室 两张单人床" loading="lazy"></a><figcaption>两张单人床<span>视频 1:30</span></figcaption></figure>
-</div></section>
-<section><div class="note">图片均截取自看房视频（原始分辨率 478×850），仅做了轻度处理：降噪、温和的白平衡与暗部提亮、2 倍超分辨率、轻微锐化。没有添加、删除或改动任何家具与房屋结构，墙面水渍等现状均保留。</div></section>
-</main><footer>带中文标注的分享版图片见 <code>stills_labeled/</code> 目录。</footer></body></html>
+<section id="r01"><div class="room"><div class="txt"><div class="step">第 1 站</div><h3>入口楼梯间</h3><div class="sub">一层独立入口</div><p>一层独立入口，红陶地砖门厅，石材楼梯配木质扶手和磨砂玻璃护板；先上 3 级到小平台，再转向上到楼上。楼梯顶端有采光窗。</p><div class="tags"><span>一层独立入户</span><span>石材楼梯 · 木扶手</span><span>顶端采光窗</span></div>
+</div><div class="shots">
+<figure><img src="stills/01_1_入口楼梯间.jpg" alt="入口楼梯间：一层入口，石材楼梯" loading="lazy"><figcaption>一层入口，石材楼梯<span>视频 0:01</span></figcaption></figure>
+<figure><img src="stills/01_2_入口楼梯间.jpg" alt="入口楼梯间：楼梯与木质扶手，尽头有窗" loading="lazy"><figcaption>楼梯与木质扶手，尽头有窗<span>视频 0:14</span></figcaption></figure>
+<figure><img src="stills/01_3_入口楼梯间.jpg" alt="入口楼梯间：楼梯顶端平台，采光窗" loading="lazy"><figcaption>楼梯顶端平台，采光窗<span>视频 0:18</span></figcaption></figure>
+</div></div></section>
+<section id="r02"><div class="room"><div class="txt"><div class="step">第 2 站</div><h3>楼梯口与走廊</h3><div class="sub">楼上动线枢纽</div><p>楼梯上来是楼梯口，有两扇窗，红陶地砖。左转是进大厅的门洞D；沿楼梯半墙护栏往前是走廊，尽头正前方厨房门，右侧客厅门。</p><div class="tags"><span>2 扇窗</span><span>红陶地砖</span><span>连通大厅、客厅、厨房</span></div>
+</div><div class="shots">
+<figure><img src="stills/02_1_楼梯口与走廊.jpg" alt="楼梯口与走廊：楼梯口的窗，红陶地砖" loading="lazy"><figcaption>楼梯口的窗，红陶地砖<span>视频 0:21</span></figcaption></figure>
+<figure><img src="stills/02_2_楼梯口与走廊.jpg" alt="楼梯口与走廊：走廊尽头是厨房门，左侧楼梯护栏" loading="lazy"><figcaption>走廊尽头是厨房门，左侧楼梯护栏<span>视频 0:28</span></figcaption></figure>
+<figure><img src="stills/02_3_楼梯口与走廊.jpg" alt="楼梯口与走廊：楼梯口的门洞D望向大厅" loading="lazy"><figcaption>楼梯口的门洞D望向大厅<span>视频 0:24</span></figcaption></figure>
+</div></div></section>
+<section id="r03"><div class="room"><div class="txt"><div class="step">第 3 站</div><h3>厨房</h3><div class="sub">约 8 ㎡ · 估算</div><p>双开窗配蓝色窗帘，窗下有燃气取暖器。靠墙吊柜、白瓷砖灶台墙面，抽油烟机位已预留（现贴着报纸）。红陶地砖。另有一扇未开启的门。</p><div class="tags"><span>双开窗</span><span>燃气取暖器</span><span>吊柜 · 灶台位</span></div>
+<div class="warn">抽油烟机位现贴着报纸遮挡，需自配油烟机。</div>
+</div><div class="shots">
+<figure><img src="stills/03_1_厨房.jpg" alt="厨房：双开窗配蓝色窗帘，窗下燃气取暖器" loading="lazy"><figcaption>双开窗配蓝色窗帘，窗下燃气取暖器<span>视频 0:42</span></figcaption></figure>
+<figure><img src="stills/03_2_厨房.jpg" alt="厨房：厨房全景，餐椅" loading="lazy"><figcaption>厨房全景，餐椅<span>视频 0:40</span></figcaption></figure>
+<figure><img src="stills/03_3_厨房.jpg" alt="厨房：灶台墙面白瓷砖，抽油烟机位置" loading="lazy"><figcaption>灶台墙面白瓷砖，抽油烟机位置<span>视频 0:34</span></figcaption></figure>
+<figure><img src="stills/03_4_厨房.jpg" alt="厨房：吊柜" loading="lazy"><figcaption>吊柜<span>视频 0:36</span></figcaption></figure>
+</div></div></section>
+<section id="r04"><div class="room"><div class="txt"><div class="step">第 4 站</div><h3>客厅</h3><div class="sub">约 20 ㎡ · 估算</div><p>两扇窗，配吊灯与取暖器，白色瓷砖地面。现有沙发、小桌和椅子。远端有一扇未开启的木门，去向为推测。</p><div class="tags"><span>2 扇窗</span><span>吊灯</span><span>白瓷砖地面</span></div>
+</div><div class="shots">
+<figure><img src="stills/04_1_客厅.jpg" alt="客厅：两扇窗与吊灯" loading="lazy"><figcaption>两扇窗与吊灯<span>视频 0:52</span></figcaption></figure>
+<figure><img src="stills/04_2_客厅.jpg" alt="客厅：入门视角，沙发与远端未开启的门" loading="lazy"><figcaption>入门视角，沙发与远端未开启的门<span>视频 0:47</span></figcaption></figure>
+<figure><img src="stills/04_3_客厅.jpg" alt="客厅：窗边与取暖器" loading="lazy"><figcaption>窗边与取暖器<span>视频 0:50</span></figcaption></figure>
+</div></div></section>
+<section id="r05"><div class="room"><div class="txt"><div class="step">第 5 站</div><h3>大厅</h3><div class="sub">约 35 ㎡ · 估算</div><p>面积最大的一间，长方形，白色瓷砖地面。三扇窗在同一面长墙，两盏吊灯。一端是通楼梯口的门洞D，另一端是门C通过道。现堆放床垫和杂物。</p><div class="tags"><span>3 扇窗</span><span>约 35 ㎡</span><span>两个出入口</span></div>
+<div class="warn">现堆放床垫、木板和纸箱，出租前需清空。</div>
+</div><div class="shots">
+<figure><img src="stills/05_1_大厅.jpg" alt="大厅：大厅全景，尽头是通楼梯口的门洞D" loading="lazy"><figcaption>大厅全景，尽头是通楼梯口的门洞D<span>视频 1:14</span></figcaption></figure>
+<figure><img src="stills/05_2_大厅.jpg" alt="大厅：三扇窗中的两扇与吊灯" loading="lazy"><figcaption>三扇窗中的两扇与吊灯<span>视频 1:02</span></figcaption></figure>
+<figure><img src="stills/05_3_大厅.jpg" alt="大厅：靠门C一端，床垫杂物" loading="lazy"><figcaption>靠门C一端，床垫杂物<span>视频 1:13</span></figcaption></figure>
+</div></div></section>
+<section id="r06"><div class="room"><div class="txt"><div class="step">第 6 站</div><h3>过道</h3><div class="sub">门C之后</div><p>门C后面的小过道，浅色瓷砖，现堆放清洁工具。卫生间和卧室都从这里进。</p><div class="tags"><span>连通卫生间、卧室</span></div>
+</div><div class="shots">
+<figure><img src="stills/06_1_过道.jpg" alt="过道：门C后的过道，右侧门洞通卫生间" loading="lazy"><figcaption>门C后的过道，右侧门洞通卫生间<span>视频 1:11</span></figcaption></figure>
+<figure><img src="stills/06_2_过道.jpg" alt="过道：从大厅望向门C与过道" loading="lazy"><figcaption>从大厅望向门C与过道<span>视频 1:09</span></figcaption></figure>
+</div></div></section>
+<section id="r07"><div class="room"><div class="txt"><div class="step">第 7 站</div><h3>卫生间</h3><div class="sub">约 6 ㎡ · 估算</div><p>白瓷砖到顶，马桶、坐浴盆、立柱洗手盆齐全，配电热水器。有窗（现用布遮挡），有晾衣架。</p><div class="tags"><span>马桶 · 坐浴盆 · 洗手盆</span><span>电热水器</span><span>有窗</span></div>
+<div class="warn">部分墙砖脱落，窗帘为临时遮布，建议出租前整修。</div>
+</div><div class="shots">
+<figure><img src="stills/07_1_卫生间.jpg" alt="卫生间：马桶、坐浴盆与电热水器" loading="lazy"><figcaption>马桶、坐浴盆与电热水器<span>视频 1:16</span></figcaption></figure>
+<figure><img src="stills/07_2_卫生间.jpg" alt="卫生间：洗手盆与窗" loading="lazy"><figcaption>洗手盆与窗<span>视频 1:23</span></figcaption></figure>
+<figure><img src="stills/07_3_卫生间.jpg" alt="卫生间：窗与晾衣架" loading="lazy"><figcaption>窗与晾衣架<span>视频 1:19</span></figcaption></figure>
+</div></div></section>
+<section id="r08"><div class="room"><div class="txt"><div class="step">第 8 站</div><h3>卧室</h3><div class="sub">约 20 ㎡ · 估算</div><p>现有两张单人床、书桌椅和床头柜，木窗配百叶卷帘，一侧有衣柜。墙面有明显水渍霉斑。</p><div class="tags"><span>两张单人床</span><span>衣柜 · 书桌</span><span>木窗 · 卷帘</span></div>
+<div class="warn">墙面有明显水渍霉斑，出租前需处理。</div>
+</div><div class="shots">
+<figure><img src="stills/08_1_卧室.jpg" alt="卧室：单人床、书桌椅与窗" loading="lazy"><figcaption>单人床、书桌椅与窗<span>视频 1:31</span></figcaption></figure>
+<figure><img src="stills/08_2_卧室.jpg" alt="卧室：卧室另一角度" loading="lazy"><figcaption>卧室另一角度<span>视频 1:32</span></figcaption></figure>
+<figure><img src="stills/08_3_卧室.jpg" alt="卧室：两张单人床" loading="lazy"><figcaption>两张单人床<span>视频 1:30</span></figcaption></figure>
+</div></div></section>
+<section id="status"><h2><small>如实告知</small>房屋现状</h2><div class="status">
+<div><b>卧室墙面</b>有明显水渍霉斑，需处理后再出租。</div>
+<div><b>厨房</b>抽油烟机位空置，现用报纸遮挡。</div>
+<div><b>卫生间</b>部分墙砖脱落，窗帘为临时遮布。</div>
+<div><b>大厅</b>堆放床垫、木板、纸箱，需清空。</div>
+<div><b>整体</b>老房，墙面有污迹，建议整体粉刷。</div>
+</div></section></main>
+<footer class="wrap">照片截取自看房视频（原始 478×850），仅做降噪、白平衡、提亮、2 倍超分与轻微锐化；未增删家具，未修改墙面现状。</footer></html></body>
