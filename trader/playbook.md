@@ -1,5 +1,5 @@
 # Claude 交易员 · 作战手册（playbook）
-版本 v1.1 · 2026-09-05 建立（v1.1：X 博主通道打通，见第 6 节） · 每次复盘后修订并递增版本号。**每次醒来先读本文件，再读账本，再看行情，最后才动手。**
+版本 v1.2 · 2026-09-05 建立（v1.1 X 博主通道；v1.2 美股账本切换到 Alpaca 模拟盘，见第 1b 节） · 每次复盘后修订并递增版本号。**每次醒来先读本文件，再读账本，再看行情，最后才动手。**
 
 ## 0. 任命与目标（用户 2026-09-05 定）
 - 身份：自主学习的模拟盘交易员。用户每天看交易、看总结；我每天写总结巩固。
@@ -12,6 +12,15 @@
 - 禁止：**期权**（用户明令）、融资做空个股、场外/盘前盘后成交（引擎只在常规时段撮合）。
 - 成交规则（引擎实现）：美股零佣金、滑点 0.05%；A股佣金 0.03%（最低 ¥5）、卖出印花税 0.05%、滑点 0.1%、100 股一手、**T+1**。限价/止损单用挂单之后的 5 分钟 K 线逐根检查，跳空按开盘价成交，不占便宜。
 
+## 1b. 美股账本 = Alpaca 模拟盘（2026-09-05 用户要求正规平台，engine.py 只管 A股 + 审计）
+- 适配器 `alpaca.py`（用法见文件头）：account / positions / orders / quote / buy / sell / cancel / cancel-all / fills / mark / rebase / html。密钥在 ~/.alpaca_paper.env，只连 paper-api；KEY 不是 PK 开头直接拒绝。
+- **买入必带 --stop**（券商侧 OTO/bracket 子单，我离线也生效），可加 --target；--reason 手册格式；--tag 策略类型（会写进 client_order_id）。买单默认限价，卖单默认市价。
+- **每次唤醒的固定动作**：`python3 alpaca.py fills`（把新成交同步进 us_trades.jsonl）→ `python3 alpaca.py mark`（净值快照 + 回撤标志）→ `python3 alpaca.py orders`。
+- 回撤 -20%：us_alpaca_state.json 里 halted=true，buy 会被拒绝，须全面检讨并经用户同意才可解除。
+- 保证金：Alpaca 给 4 倍日内/2 倍隔夜购买力，**手册上限不变**（有效敞口 ≤ 200%、杠杆 ETF ≤ 50%）；原则上不用保证金，现金不足会警告。
+- 基准净值：账户当前 $100,000（用户尚未重置）；用户在后台重置为 $1,000,000 后运行 `python3 alpaca.py rebase`。收益按百分比计，绝对金额不影响目标。
+- 时间：Alpaca 用 ET，适配器输出已转北京时间。`python3 alpaca.py html` 生成两本账页面（美股=Alpaca，A股=engine）。
+
 ## 2. 风控铁律（用户定 + 我自定）
 1. **回撤 -10%**（自峰值）：可继续交易，但必须写专项检讨（为什么、错在哪、改什么）。
 2. **回撤 -20%**：引擎自动 halt，停止开新仓，从头到尾全面检讨并分析原因；解除需完成检讨并把 state 里 halted 改回 false，并告知用户。
@@ -23,9 +32,10 @@
 8. 有效敞口 > 150% 时，必须持有对冲或把止损收紧到 5% 以内。
 
 ## 3. 交易流程（每次唤醒按此执行）
-- **盘前档**：读手册 → `engine.py status all` → 隔夜要闻/期货/亚欧盘/催化剂（第 6 节信源）→ 写当日计划到 `research/YYYY-MM-DD-plan.md`（观点、点位、条件单）→ 下单（`order`）。
-- **盘中档（每小时）**：`engine.py run <book>` 撮合 → 看持仓/挂单是否触发 → 只按计划执行；突发（>2% 大盘异动、重大新闻）才临时调整，并记录理由。
-- **盘后档**：`run` + `mark` → 写日报 `reports/daily/YYYY-MM-DD.md` → 追加 `lessons.jsonl` → 修订手册 → `engine.py html` 并发布到 GitHub Pages（catalyst-site/trader/）→ 向用户汇报。
+- **盘前档**：读手册 → `alpaca.py fills && alpaca.py account && alpaca.py orders`（美股）/ `engine.py status cn`（A股）→ 隔夜要闻/期货/亚欧盘/催化剂（第 6 节信源）→ 写当日计划到 `research/YYYY-MM-DD-plan.md`（观点、点位、条件单）→ 下单（`order`）。
+- **盘中档（每小时）**：美股 `alpaca.py fills && alpaca.py mark && alpaca.py orders`；A股 `engine.py run cn` → 看持仓/挂单是否触发 → 只按计划执行；突发（>2% 大盘异动、重大新闻）才临时调整，并记录理由。
+- **盘后档**：美股 `alpaca.py fills && alpaca.py mark`；A股 `engine.py run cn && engine.py mark cn` → 写日报 `reports/daily/YYYY-MM-DD.md` → 追加 `lessons.jsonl` → 修订手册 → `alpaca.py html` 并发布到 GitHub Pages（catalyst-site/trader/）→ 向用户汇报。
+- 下单命令：美股 `python3 alpaca.py buy SYM --amount 金额 --type limit --limit 价 --stop 止损 [--target 止盈] --reason ... --tag ...`；A股 `python3 engine.py order cn buy 代码 --amount 金额 --type limit --limit 价 --stop 止损 --reason ... --tag ...`。
 - 每笔交易的理由格式（写进 `--reason`）：`论点 | 催化剂 | 失效条件 | 目标 | 期限 | 信心1-10 | 信源`。
 
 ## 4. 策略框架 v1（随复盘迭代）
@@ -71,4 +81,5 @@ E. 空仓也是仓位：没有优势时持币，别为交易而交易。
 - [ ] 把 trader/index.html 挂到 GitHub Pages（catalyst-site/trader/index.html），并让星引模型看板链接过来
 - [ ] 11/1 前改 A股 cron（夏令时结束）
 - [x] X 博主：内置浏览器登录态可读（2026-09-05）；待验证定时任务会话能否复用登录态
-- [ ] **美股账本切换到 Alpaca 模拟盘**（用户 9/5 要求正规平台；等用户注册并把 paper 密钥放到 ~/.alpaca_paper.env 后，写 alpaca.py 适配器、更新各任务提示词、engine 降级为审计账本；A股继续用 engine）
+- [x] 美股账本切换到 Alpaca 模拟盘（2026-09-05 完成，alpaca.py 测通）
+- [ ] 用户把 Alpaca 模拟资金重置为 $1,000,000 后运行 `alpaca.py rebase`
