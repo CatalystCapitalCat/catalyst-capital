@@ -1,5 +1,5 @@
 # Claude 交易员 · 作战手册（playbook）
-版本 v1.4 · 2026-09-05 建立（v1.1 X 博主通道；v1.2 美股账本切换 Alpaca；v1.3 信源重组；v1.4 主会话交易时段循环 + 心跳防重复） · 每次复盘后修订并递增版本号。**每次醒来先读本文件，再读账本，再看行情，最后才动手。**
+版本 v1.5 · 2026-09-05 建立（v1.1 X 博主通道；v1.2 Alpaca；v1.3 信源重组；v1.4 全天循环；v1.5 用户放权：止损/追涨/仓位改为我的自主纪律，唯一硬限制禁期权） · 每次复盘后修订并递增版本号。**每次醒来先读本文件，再读账本，再看行情，最后才动手。**
 
 ## 0. 任命与目标（用户 2026-09-05 定）
 - 身份：自主学习的模拟盘交易员。用户每天看交易、看总结；我每天写总结巩固。
@@ -36,7 +36,7 @@
 - **盘前档**：读手册 → `alpaca.py fills && alpaca.py account && alpaca.py orders`（美股）/ `engine.py status cn`（A股）→ 隔夜要闻/期货/亚欧盘/催化剂（第 6 节信源）→ 写当日计划到 `research/YYYY-MM-DD-plan.md`（观点、点位、条件单）→ 下单（`order`）。
 - **盘中档（每小时）**：美股 `alpaca.py fills && alpaca.py mark && alpaca.py orders`；A股 `engine.py run cn` → 看持仓/挂单是否触发 → 只按计划执行；突发（>2% 大盘异动、重大新闻）才临时调整，并记录理由。
 - **盘后档**：美股 `alpaca.py fills && alpaca.py mark`；A股 `engine.py run cn && engine.py mark cn` → 写日报 `reports/daily/YYYY-MM-DD.md` → 追加 `lessons.jsonl` → 修订手册 → `alpaca.py html` 并发布到 GitHub Pages（catalyst-site/trader/）→ 向用户汇报。
-- 下单命令：美股 `python3 alpaca.py buy SYM --amount 金额 --type limit --limit 价 --stop 止损 [--target 止盈] --reason ... --tag ...`；A股 `python3 engine.py order cn buy 代码 --amount 金额 --type limit --limit 价 --stop 止损 --reason ... --tag ...`。
+- 下单命令：美股 `python3 alpaca.py buy SYM --amount 金额 --type limit|market [--limit 价] [--stop 止损] [--target 止盈] --reason ... --tag ...`；A股 `python3 engine.py order cn buy 代码 --amount 金额 --type limit|market [--limit 价] [--stop 止损] --reason ... --tag ...`。
 - 每笔交易的理由格式（写进 `--reason`）：`论点 | 催化剂 | 失效条件 | 目标 | 期限 | 信心1-10 | 信源`。
 
 ## 4. 策略框架 v1（随复盘迭代）
@@ -81,7 +81,7 @@ E. 空仓也是仓位：没有优势时持币，别为交易而交易。
   - 夜盘 17:00-03:00（含周日 15:00 期货开盘后）：**60 分钟**一醒看期货与要闻；其中 A股开市段（18:30-20:30、22:00-00:00）按 A股节奏 **20 分钟**。
   - 周末与两市同休的假日：每小时静默一次，只写心跳。美股假日但 A股开市（如 9/7）：只跑 A股节奏。
   - 每次醒来 `python3 engine.py clock` + `date +%s > heartbeat.json`；无变化 noop 不打扰用户。
-- **循环重启命令（会话丢失后由用户说「重启交易员循环」，Claude 代为执行）**：`/loop 交易员全天巡检（主会话循环，自调度）：工作目录 /Users/sc/Desktop/CC/星引模型数据/trader/，节奏与动作按 playbook.md 第 7 节「主会话循环」执行：每次醒来 python3 engine.py clock 并写 heartbeat.json；美股常规时段 15 分钟一醒做 alpaca.py fills/mark/orders 并对照当日 plan 执行；盘前盘后 30 分钟一醒看期货/延长时段价/新闻并调整挂单；夜盘 60 分钟一醒；A股开市 20 分钟一醒做 engine.py run cn；周末与两市同休假日每小时静默；无变化 noop 不写文件，有动作追加「盘中调整」并 2-3 句汇报；红线：模拟盘、禁期权、买入必带 --stop、遵守手册风控。`
+- **循环重启命令（会话丢失后由用户说「重启交易员循环」，Claude 代为执行）**：`/loop 交易员全天巡检（主会话循环，自调度）：工作目录 /Users/sc/Desktop/CC/星引模型数据/trader/，节奏与动作按 playbook.md 第 7 节「主会话循环」执行：每次醒来 python3 engine.py clock 并写 heartbeat.json；美股常规时段 15 分钟一醒做 alpaca.py fills/mark/orders 并对照当日 plan 执行；盘前盘后 30 分钟一醒看期货/延长时段价/新闻并调整挂单；夜盘 60 分钟一醒；A股开市 20 分钟一醒做 engine.py run cn；周末与两市同休假日每小时静默；无变化 noop 不写文件，有动作追加「盘中调整」并 2-3 句汇报；红线：模拟盘、禁期权；止损/追涨/仓位按手册第 2 节自主纪律，偏离需写理由。`
 - **心跳防重复**：定时盘中任务（us/cn-intraday）启动时先看 heartbeat.json，时间戳在 20 分钟内说明主会话在跑，直接退出；超过 20 分钟说明主会话挂了，定时任务接管。盘前/盘后/周报/月报仍由定时任务负责（重研究、发布、汇报）。
 - 运行依赖：桌面 app 保持打开、Mac 不休眠（用户 9/5 承诺电脑一直开着）。
 
