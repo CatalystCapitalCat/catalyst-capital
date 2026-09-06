@@ -1,0 +1,9 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Claude 交易员 · 文档</title>
+<style>body{font-family:-apple-system,"PingFang SC",sans-serif;max-width:900px;margin:24px auto;padding:0 16px;color:#333;line-height:1.6}table{border-collapse:collapse;font-size:14px;display:block;overflow-x:auto}td,th{border:1px solid #ddd;padding:6px 8px}th{background:#f6f6f6}code{background:#f3f3f3;padding:1px 4px;border-radius:3px}pre{background:#f6f6f6;padding:10px;overflow-x:auto}a{color:#5b3fd6}h1,h2,h3{margin-top:1.4em}.nav{font-size:14px;margin-bottom:16px}</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script></head>
+<body><div class="nav"><a href="./">← 模拟盘首页</a> · <a href="reports/">日报/周报/月报</a> · <a href="research/">研究笔记</a></div><div id="c">加载中…</div>
+<script>
+const f=new URLSearchParams(location.search).get('f');
+if(!f||f.includes('..')||!f.endsWith('.md')){document.getElementById('c').textContent='缺少文件参数';}
+else fetch(f,{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error(r.status);return r.text()}).then(t=>{document.title=(t.match(/^#\s*(.+)$/m)||[,'文档'])[1];document.getElementById('c').innerHTML=marked.parse(t)}).catch(e=>{document.getElementById('c').textContent='读取失败 '+e});
+</script></body></html>
