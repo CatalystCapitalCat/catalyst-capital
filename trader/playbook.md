@@ -66,7 +66,9 @@ H. **（v1.6 新增）A股 / 美股同板块背离监控**：每周计算美股�
   4. **主动交代样本弱点的信源，可信度加分。** 好奇先生给苹果回测时主动说「只有 10 次样本、被 2020 拉高均值」——**这种自我设限是可信度的正向信号**，与主任的自我美化形成对照。
   5. **机构公开对立 = 无拥挤共识 = 可以小仓试探。** 例：美银「还有三次加息」vs 摩根资管「60% 概率过早」。
 
-## 6. 信源清单（2026-09-05 实测可直读的，无需登录）
+## 6. 信源清单
+- **⚠ 内置浏览器面板一重启，X / 知识星球 / Whop 登录态全部丢失（2026-09-06 实测，面板在周报任务之后重启过一次）。** 每次唤醒读信源前先验证：X 看到「登录」页、星球看到「加入星球 ￥1999」售卖页、Whop 看到「立即加入 US$29.99」页 = 登录态丢失，不是会员到期；此时改用 WebSearch 并在总结里提醒用户重登（X 密码 / 星球微信扫码 / Whop 邮箱验证码），不要据此下「会员到期」的结论。
+（2026-09-05 实测可直读的，无需登录）
 - 行情：Yahoo chart API（美股实时）、新浪 hq/K线（A股实时）。
 - 新闻流：finviz.com/news.ashx、finviz 个股页（quote.ashx?t=）、seekingalpha.com/market-news、zerohedge.com/markets、wsj.com/market-data、CNBC（WebFetch）。
 - 期权/资金面：unusualwhales.com/news、cboe.com 日度 put/call 统计、squeezemetrics.com DIX/GEX、optionstrat.com。
