@@ -117,6 +117,8 @@ def resolve_purchases(events):
     for e in events:
         t = e.get("type")
         pid = e.get("participantId")
+        if not pid:  # 辅助的世界地图集在 0 秒以 participantId 0 记录，跳过
+            continue
         if t == "ITEM_PURCHASED":
             buys.setdefault(pid, []).append([e.get("timestamp", 0), e.get("itemId")])
         elif t == "ITEM_UNDO":
@@ -212,8 +214,8 @@ def _parse_one(ds, static, mid, W, plog):
         "game_end_utc": ms_to_iso(info.get("gameEndTimestamp")),
         "duration_s": int(dur), "duration_min": mins, "remake": int(remake),
         "surrender": int(any(p.get("gameEndedInSurrender") for p in parts)),
-        "pid": me.get("participantId"), "champ": me.get("championName", ""),
-        "champ_zh": static.champ_name(me.get("championName", "")), "team_id": my_team,
+        "pid": me.get("participantId"), "champ": static.champ_id(me),
+        "champ_zh": static.champ_name(static.champ_id(me)), "team_id": my_team,
         "side": "蓝方" if my_team == 100 else "红方", "position": pos, "position_zh": POSITION_ZH.get(pos, pos),
         "win": int(bool(me.get("win"))), "cs_lane": me.get("totalMinionsKilled") or 0,
         "cs_jungle": me.get("neutralMinionsKilled") or 0, "team_dmg": team_dmg.get(my_team),
@@ -250,7 +252,7 @@ def _parse_one(ds, static, mid, W, plog):
         g.update({
             "opp_pid": opp.get("participantId"), "opp_puuid": opp.get("puuid"),
             "opp_name": "%s#%s" % (opp.get("riotIdGameName") or opp.get("summonerName") or "?", opp.get("riotIdTagline") or ""),
-            "opp_champ": opp.get("championName"), "opp_champ_zh": static.champ_name(opp.get("championName", "")),
+            "opp_champ": static.champ_id(opp), "opp_champ_zh": static.champ_name(static.champ_id(opp)),
             "opp_kills": ob["kills"], "opp_deaths": ob["deaths"], "opp_assists": ob["assists"],
             "opp_cs_per_min": ob["cs_per_min"], "opp_dmg_share": ob["dmg_share"], "opp_kp": ob["kp"],
             "opp_vision": ob["vision"], "opp_vision_per_min": ob["vision_per_min"], "opp_gold": ob["gold"],
@@ -276,7 +278,7 @@ def _parse_one(ds, static, mid, W, plog):
     g["exclude_reason"] = reason or ""
 
     pid_team = {p.get("participantId"): p.get("teamId") for p in parts}
-    pid_champ = {p.get("participantId"): p.get("championName") for p in parts}
+    pid_champ = {p.get("participantId"): static.champ_name(static.champ_id(p)) for p in parts}
     first_item = {}
     snap = {}
     if tl is not None and not remake:
@@ -286,7 +288,7 @@ def _parse_one(ds, static, mid, W, plog):
         if tl_map:
             remap = {tl_map.get(p.get("puuid")): p for p in parts}
             pid_team = {pid: p.get("teamId") for pid, p in remap.items() if pid}
-            pid_champ = {pid: p.get("championName") for pid, p in remap.items() if pid}
+            pid_champ = {pid: static.champ_name(static.champ_id(p)) for pid, p in remap.items() if pid}
             my_pid = tl_map.get(ds.puuid, g["pid"])
             opp_pid = tl_map.get(opp.get("puuid")) if opp else None
         else:
@@ -315,9 +317,15 @@ def _parse_one(ds, static, mid, W, plog):
                         tg[pid_team[pid]] += pf.get("totalGold") or 0
                 g["team_gold_diff_%d" % minute] = tg[my_team] - tg[enemy]
         # 加点顺序（前 3 级）
-        skills = [SKILL_KEYS.get(e.get("skillSlot"), "?") for e in events
-                  if e.get("type") == "SKILL_LEVEL_UP" and e.get("participantId") == my_pid
-                  and e.get("levelUpType", "NORMAL") == "NORMAL"]
+        # 15.17 起时间线有重复的 SKILL_LEVEL_UP 事件：按 (参与者, 技能, 时间) 去重
+        seen, skills = set(), []
+        for e in events:
+            if (e.get("type") == "SKILL_LEVEL_UP" and e.get("participantId") == my_pid
+                    and e.get("levelUpType", "NORMAL") == "NORMAL"):
+                k = (e.get("skillSlot"), e.get("timestamp"))
+                if k not in seen:
+                    seen.add(k)
+                    skills.append(SKILL_KEYS.get(e.get("skillSlot"), "?"))
         g["skill_order_1_3"] = "-".join(skills[:3])
         # 购买（扣掉撤销）→ 首件成装
         buys = resolve_purchases(events)
@@ -349,8 +357,8 @@ def _parse_one(ds, static, mid, W, plog):
         pid = p.get("participantId")
         row = {"match_id": mid, "pid": pid, "puuid": p.get("puuid"),
                "riot_id": "%s#%s" % (p.get("riotIdGameName") or p.get("summonerName") or "?", p.get("riotIdTagline") or ""),
-               "team_id": p.get("teamId"), "position": p.get("teamPosition") or "", "champ": p.get("championName"),
-               "champ_zh": static.champ_name(p.get("championName", "")), "win": int(bool(p.get("win"))),
+               "team_id": p.get("teamId"), "position": p.get("teamPosition") or "", "champ": static.champ_id(p),
+               "champ_zh": static.champ_name(static.champ_id(p)), "win": int(bool(p.get("win"))),
                "is_him": int(p.get("puuid") == ds.puuid), "same_team": int(p.get("teamId") == my_team),
                "is_lane_opp": int(bool(opp) and p.get("puuid") == opp.get("puuid"))}
         row.update(b)
@@ -431,6 +439,8 @@ def _events_rows(mid, events, pid_team, pid_champ, my_pid, opp_pid, my_team, W):
             killer = e.get("killerId") or 0
             assists = e.get("assistingParticipantIds") or []
             kteam = e.get("killerTeamId") or pid_team.get(killer, "")
+            if kteam not in (100, 200):  # 先锋到时间消失也会记一条 killerTeamId=300 的事件，不算任何一方
+                continue
             W["objs"].row({
                 "match_id": mid, "ts_ms": ts, "t_min": ts / 60000.0, "monster_type": e.get("monsterType", ""),
                 "sub_type": e.get("monsterSubType", ""), "killer_pid": killer, "killer_team": kteam,
