@@ -28,6 +28,8 @@ from lolanalysis.staticdata import COMPLETED_RULE, StaticData  # noqa: E402
 
 # 我的英雄池：武器大师、荒漠屠夫（鳄鱼）、机械公敌（兰博）、铁血狼母（安蓓萨）
 MY_POOL = "Jax,Renekton,Rumble,Ambessa"
+# 最近两个版本的官方公告/Wiki 摘录（带版本号和链接）
+DEFAULT_PATCH_NOTES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "patch_notes_26.20-26.21.json")
 
 
 def ds_meta(ds):
@@ -151,13 +153,13 @@ def main(argv=None):
                        help="我的英雄池（Data Dragon 英雄 id，逗号分隔；默认：%(default)s）")
         p.add_argument("--out", required=True)
         p.add_argument("--strategy", default=None)
-        p.add_argument("--patch-notes", default=None, help="版本公告摘录（JSON，见 patch_notes.example.json）")
+        p.add_argument("--patch-notes", default=DEFAULT_PATCH_NOTES if os.path.exists(DEFAULT_PATCH_NOTES) else None, help="版本公告摘录（JSON，见 patch_notes.example.json）")
         p.add_argument("--games", type=int, default=3)
     for name in ("stats", "calibrate", "report"):
         p = sub.add_parser(name)
         p.add_argument("--out", required=True)
         p.add_argument("--strategy", default=None)
-        p.add_argument("--patch-notes", default=None, help="版本公告摘录（JSON，见 patch_notes.example.json）")
+        p.add_argument("--patch-notes", default=DEFAULT_PATCH_NOTES if os.path.exists(DEFAULT_PATCH_NOTES) else None, help="版本公告摘录（JSON，见 patch_notes.example.json）")
         p.add_argument("--games", type=int, default=3, help="核对图画几场（calibrate）")
     args = ap.parse_args(argv)
     if args.cmd == "parse":

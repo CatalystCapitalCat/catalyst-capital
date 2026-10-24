@@ -212,6 +212,8 @@ CHAMPIONS = {
     "Fiora": (114, "Fiora", "the Grand Duelist", "无双剑姬", "菲奥娜", ["Fighter", "Assassin"], "Mana", "fighter"),
     "Jax": (24, "Jax", "Grandmaster at Arms", "武器大师", "贾克斯", ["Fighter"], "Mana", "fighter"),
     "Renekton": (58, "Renekton", "the Butcher of the Sands", "荒漠屠夫", "雷克顿", ["Fighter", "Tank"], "Fury", "fighter"),
+    "Rumble": (68, "Rumble", "the Mechanized Menace", "机械公敌", "兰博", ["Fighter", "Mage"], "Heat", "mage"),
+    "Ambessa": (799, "Ambessa", "Matriarch of War", "铁血狼母", "安蓓萨", ["Fighter", "Assassin"], "Energy", "fighter"),
     "Ornn": (516, "Ornn", "The Fire below the Mountain", "山隐之焰", "奥恩", ["Tank"], "Mana", "tank"),
     "KSante": (897, "K'Sante", "the Pride of Nazumah", "纳祖芒荣耀", "奎桑提", ["Tank", "Fighter"], "Mana", "tank"),
     "Orianna": (61, "Orianna", "the Lady of Clockwork", "发条魔灵", "奥莉安娜", ["Mage", "Support"], "Mana", "mage"),
@@ -241,8 +243,10 @@ CHAMPIONS = {
     "Nami": (267, "Nami", "the Tidecaller", "唤潮鲛姬", "娜美", ["Support", "Mage"], "Mana", "enchanter"),
 }
 TARGET_POOL = ["LeeSin", "Viego", "Nidalee", "XinZhao"]
+# always present in the Data Dragon stand-ins (the analysing player's own champion pool)
+EXTRA_DDRAGON_CHAMPS = ["Jax", "Renekton", "Rumble", "Ambessa"]
 ROLE_POOLS = {
-    "TOP": ["Aatrox", "Garen", "Darius", "Fiora", "Jax", "Renekton", "Ornn", "KSante"],
+    "TOP": ["Aatrox", "Garen", "Darius", "Fiora", "Jax", "Renekton", "Ornn", "KSante", "Rumble", "Ambessa"],
     "JUNGLE": ["JarvanIV", "Graves", "Kindred", "Vi", "Elise", "Hecarim", "Khazix", "Sejuani", "Belveth", "Lillia"],
     "MIDDLE": ["Orianna", "Yasuo", "Zed", "Viktor", "Azir", "Sylas", "Leblanc", "Ahri", "Syndra"],
     "BOTTOM": ["Jinx", "Kaisa", "Ezreal", "Caitlyn", "Jhin", "Varus", "MissFortune", "Xayah"],
@@ -370,7 +374,7 @@ def respawn_seconds(level, t_s):
 # --------------------------------------------------------------------------
 # Data Dragon writers
 # --------------------------------------------------------------------------
-PARTYPE_ZH = {"Mana": "法力", "Energy": "能量", "None": "无", "Fury": "怒气",
+PARTYPE_ZH = {"Mana": "法力", "Energy": "能量", "None": "无", "Fury": "怒气", "Heat": "热量",
               "Flow": "剑意", "BloodWell": "鲜血魔井"}
 
 
@@ -404,6 +408,51 @@ def ddragon_champion_json(version, locale, champ_ids):
             },
         }
     return {"type": "champion", "format": "standAloneComplex", "version": version, "data": data}
+
+
+def ddragon_champion_full_json(version, locale, champ_ids):
+    """championFull.json stand-in: adds spells/passive/skins/lore (values synthetic)."""
+    base = ddragon_champion_json(version, locale, champ_ids)
+    zh_loc = locale == "zh_CN"
+    keys = {}
+    for cid, c in base["data"].items():
+        rnd = random.Random("full-" + cid)
+        keys[c["key"]] = cid
+        partype = CHAMPIONS[cid][6]
+        spells = []
+        for slot, letter in enumerate("QWER"):
+            ranks = 3 if letter == "R" else 5
+            cd0 = rnd.choice([80, 100, 120, 140]) if letter == "R" else rnd.choice([6, 8, 10, 12, 14, 16, 18])
+            step = (cd0 // 5) if letter == "R" else rnd.choice([0, 0.5, 1, 1])
+            cds = [round(cd0 - step * i, 1) for i in range(ranks)]
+            c0 = rnd.choice([40, 50, 60, 70, 80])
+            cost = [0] * ranks if partype in ("None", "Fury", "BloodWell", "Flow", "Heat") else \
+                [c0 + (0 if partype == "Energy" else 5 * i) for i in range(ranks)]
+            rng_ = rnd.choice([125, 300, 600, 900, 1100, 1200])
+            fmt = lambda xs: "/".join("%g" % x for x in xs) if len(set(xs)) > 1 else "%g" % xs[0]
+            nm = ("%s %s（合成数据）" % (c["name"], letter)) if zh_loc else ("%s %s (synthetic)" % (c["name"], letter))
+            spells.append({
+                "id": "%s%s" % (cid, letter), "name": nm,
+                "description": ("合成测试数据，非真实技能描述。" if zh_loc else "Synthetic test data, not a real spell description."),
+                "tooltip": "", "leveltip": {"label": [], "effect": []}, "maxrank": ranks,
+                "cooldown": cds, "cooldownBurn": fmt(cds), "cost": cost, "costBurn": fmt(cost),
+                "datavalues": {}, "effect": [None] + [[0] * ranks for _ in range(10)],
+                "effectBurn": [None] + ["0"] * 10, "vars": [],
+                "costType": ("{{ abilityresourcename }}" if cost[0] else ("无消耗" if zh_loc else "No Cost")),
+                "maxammo": "-1", "range": [rng_] * ranks, "rangeBurn": "%d" % rng_,
+                "image": {"full": "%s%s.png" % (cid, letter), "sprite": "spell0.png", "group": "spell",
+                          "x": 48 * slot, "y": 0, "w": 48, "h": 48},
+                "resource": ("{{ cost }} {{ abilityresourcename }}" if cost[0] else ""),
+            })
+        c.update({
+            "skins": [{"id": c["key"] + "000", "num": 0, "name": "default", "chromas": False}],
+            "lore": c["blurb"], "allytips": [], "enemytips": [], "spells": spells,
+            "passive": {"name": ("%s 被动（合成数据）" % c["name"]) if zh_loc else "%s Passive (synthetic)" % c["name"],
+                        "description": "合成测试数据。" if zh_loc else "Synthetic test data.",
+                        "image": {"full": "%s_P.png" % cid, "sprite": "passive0.png", "group": "passive",
+                                  "x": 0, "y": 0, "w": 48, "h": 48}},
+            "recommended": []})
+    return {"type": base["type"], "format": "full", "version": version, "keys": keys, "data": base["data"]}
 
 
 def item_depth(iid, _memo={}):
@@ -478,7 +527,7 @@ def ddragon_item_json(version, locale, item_ids):
         if frm:
             entry["from"] = [str(f) for f in frm]
         if into.get(iid):
-            entry["into"] = [str(t) for t in sorted(set(into[iid])) if t in ids or True]
+            entry["into"] = [str(t) for t in sorted(set(into[iid])) if t in ids]
         d = item_depth(iid)
         if d > 1:
             entry["depth"] = d
@@ -562,7 +611,8 @@ MATCH_PLAN = [
          kda=(10, 3, 8), ganks=[(240, "TOP", "assist"), (500, "BOTTOM", "kill")], duo=True),
     dict(side=100, role="JUNGLE", champ="LeeSin", win=False, dur=2010, opening="TOP_START_BOT_GANK",
          kda=(4, 4, 6), ganks=[(194, "BOTTOM", "fail"), (450, "MIDDLE", "kill")], status="timeline_failed"),
-    dict(side=200, role="JUNGLE", champ="LeeSin", win=False, dur=205, kda=(0, 0, 0), status="remake"),
+    dict(side=200, role="JUNGLE", champ="LeeSin", win=False, dur=205, kda=(0, 0, 0), status="remake",
+         opening="BOT_START_FULLCLEAR_TOP"),
     dict(side=100, role="JUNGLE", champ="Viego", win=False, dur=1720, opening="TOP_START_BOT_GANK",
          kda=(2, 5, 4), ganks=[(197, "BOTTOM", "fail_death"), (540, "TOP", "fail")], hotspot=(410, "ganked")),
     dict(side=200, role="JUNGLE", champ="Nidalee", win=False, dur=2240, opening="BOT_START_FULLCLEAR_TOP",
@@ -843,7 +893,7 @@ class MatchBuilder(object):
                         continue
                     c_name, cpos = min(ready, key=lambda cp: math.hypot(cp[1][0] - pos[0], cp[1][1] - pos[1]))
                     t += math.hypot(cpos[0] - pos[0], cpos[1] - pos[1]) / JG_SPEED + CLEAR_DUR[c_name] * 0.8
-                    q.camps.append((t, c_name, cpos, True, 4, 85 + int(t / 60), 160 + int(t / 60) * 9))
+                    q.camps.append((t, c_name, cpos, True, 4, 85 + int(t / 60), 120 + int(t / 60) * 6))
                     q.anchors.append((int(t * 1000), self.jitter(cpos, 150)))
                     last_clear[(team, c_name)] = t
                     pos = cpos
@@ -856,7 +906,7 @@ class MatchBuilder(object):
                     c_name = rng.choice(ready)
                     cpos = CAMPS[enemy][c_name]
                     t += math.hypot(cpos[0] - pos[0], cpos[1] - pos[1]) / JG_SPEED + CLEAR_DUR[c_name] * 0.8
-                    q.camps.append((t, c_name, cpos, False, 4, 85 + int(t / 60), 160 + int(t / 60) * 9))
+                    q.camps.append((t, c_name, cpos, False, 4, 85 + int(t / 60), 120 + int(t / 60) * 6))
                     q.anchors.append((int(t * 1000), self.jitter(cpos, 150)))
                     last_clear[(enemy, c_name)] = t
                     pos = cpos
@@ -1049,13 +1099,16 @@ class MatchBuilder(object):
         for side in (team, enemy):
             killers = [x for x in self.team(side) if not x.is_target]
             victims = [x for x in self.team(300 - side) if not x.is_target]
+            weights = [{"TOP": 1.0, "JUNGLE": 1.1, "MIDDLE": 1.2, "BOTTOM": 1.5, "UTILITY": 0.35}[x.pos]
+                       for x in killers]
             while self.team_kills(side) < totals[side] and tries < 40000:
                 tries += 1
                 t = rt(200 * 1000)
-                kl = rng.choice(killers)
+                kl = rng.choices(killers, weights)[0]
                 v = rng.choice(victims)
                 nmax = 1 if t < 600000 else 4
-                ass = rng.sample([x for x in killers if x is not kl], rng.randint(0, nmax))
+                pop = [x for x in killers if x is not kl]
+                ass = rng.sample(pop, min(len(pop), rng.randint(0, nmax)))
                 self.add_kill(t, kl, v, ass, self.kill_pos(t, v, kl), "filler")
         self.kills.sort(key=lambda k: k["t"])
 
@@ -1171,13 +1224,10 @@ class MatchBuilder(object):
                     seq.append(("TOWER", push, 1))
             tier_range = {0: (0.45, 0.62), 1: (0.6, 0.8), 2: (0.78, 0.9), "INHIB": (0.86, 0.94)}
             last_lane = {}
+            last_any = 0
             for kind, lane, tier in seq:
                 if kind == "NEXUS":
-                    lo_t, hi_t = end - 80000, end - 20000
-                    t = rng.uniform(lo_t, hi_t) if tier == 0 else max(last_lane.get("NEXUS", 0) + 5000,
-                                                                       rng.uniform(lo_t, hi_t))
-                    t = max(t, last_lane.get(lane, 0) + 4000)
-                    last_lane["NEXUS"] = t
+                    t = max(rng.uniform(end - 80000, end - 20000), last_any + 5000)
                     pos = NEXUS_TURRETS[defender][tier]
                 else:
                     key = "INHIB" if kind == "INHIB" else tier
@@ -1186,10 +1236,11 @@ class MatchBuilder(object):
                     t = max(t, last_lane.get(lane, 0) + rng.uniform(15000, 90000))
                     pos = INHIBS[defender][lane] if kind == "INHIB" else TOWERS[defender][lane][tier]
                 if t > end - 15000:
-                    t = end - rng.uniform(15000, 19000)
+                    t = end - rng.uniform(15000, 19000) + (seq.index((kind, lane, tier)) * 700)
                 if kind != "NEXUS":
                     last_lane[lane] = t
-                t = self.ev_t(t)
+                t = self.ev_t(max(t, last_any + 1500))
+                last_any = t
                 cands = [x for x in self.team(attacker) if x.alive(t) and not x.afk]
                 lane_mates = [x for x in cands if LANE_OF_POSITION[x.pos] == lane or x.pos == "JUNGLE"]
                 killer = None
@@ -1221,3 +1272,1760 @@ class MatchBuilder(object):
                                         "killer": killer.pid if killer else 0, "pos": TOWERS[defender][lane][0]})
         self.buildings.sort(key=lambda b: b["t"])
         self.plates.sort(key=lambda b: b["t"])
+
+    # ---------------- per-second simulation ----------------
+    def simulate(self):
+        rng = self.rng
+        end_s = self.end_ms // 1000
+        idx = {}
+        for k in self.kills:
+            idx.setdefault(k["t"] // 1000, []).append(("kill", k))
+        for o in self.objectives:
+            idx.setdefault(o["t"] // 1000, []).append(("obj", o))
+        for b in self.buildings:
+            idx.setdefault(b["t"] // 1000, []).append(("bld", b))
+        for pl in self.plates:
+            idx.setdefault(pl["t"] // 1000, []).append(("plate", pl))
+        for q in self.parts:
+            for camp in q.camps:
+                idx.setdefault(int(camp[0]), []).append(("camp", (q, camp)))
+        frame_secs = {ts // 1000: i for i, ts in enumerate(self.frame_ts)}
+        cs_rate = {"TOP": 7.4, "MIDDLE": 7.8, "BOTTOM": 8.2, "UTILITY": 0.9, "JUNGLE": 0.0}
+        dmg_rate = {"mage": 9, "marksman": 9, "assassin": 8, "fighter": 8, "tank": 5, "tank_support": 3.5,
+                    "enchanter": 3, "lee": 7.5, "viego": 7.5, "xin": 7.5, "nidalee": 8.5}
+        magic_cls = ("mage", "nidalee", "enchanter")
+        fight_times = {q.pid: sorted(set(q.active)) for q in self.parts}
+        self.level_events = []
+        for q in self.parts:
+            q.skill = rng.uniform(0.85, 1.15)
+            q.xp = 0.0
+            q.gold = 500.0
+            q.cs_f = 0.0
+            q.jcs = 0
+            q.jcs_own = 0
+            q.jcs_enemy = 0
+            q.scuttles = 0
+            q.level = 1
+            q.gold_series = [500.0] * (end_s + 2)
+            q.snap = {}
+            q.dmg = {k: 0.0 for k in ("pd", "md", "td", "pc", "mc", "tc", "pt", "mt", "tt")}
+            q.cc = 0.0
+            q.heal = 0.0
+            q.shield = 0.0
+            q.self_mit = 0.0
+            q.cs_at_10 = 0
+            q.jcs_at_10 = 0
+            q.level_times = {1: 0}
+        team_size_alive = {}
+        for s in range(0, end_s + 1):
+            t_ms = s * 1000
+            for q in self.parts:
+                alive = q.alive(t_ms) and not q.afk
+                if s >= 65:
+                    q.gold += 2.04
+                if alive and s >= 90:
+                    rate = cs_rate[q.pos] * q.skill
+                    if q.is_target and q.pos == "MIDDLE":
+                        rate *= 0.85
+                    if q.pos == "JUNGLE":
+                        rate = 1.2 if s > 600 else 0.0
+                    if s > 1500:
+                        rate *= 1.1
+                    if s >= 95:
+                        before = int(q.cs_f)
+                        q.cs_f += rate / 60.0
+                        q.gold += (int(q.cs_f) - before) * (21 + s / 120.0)
+                    if q.pos == "JUNGLE":
+                        if s > self.openings[q.team]["opening_end_ms"] / 1000.0:
+                            q.xp += 1.5 + s / 900.0
+                    else:
+                        xr = 7.6 + s / 600.0
+                        if q.pos in ("BOTTOM", "UTILITY"):
+                            xr *= 0.75 if s < 840 else 0.9
+                        q.xp += xr * (0.9 + 0.1 * q.skill)
+                    if q.pos == "UTILITY":
+                        q.gold += 0.9
+                    # damage accounting
+                    near_fight = any(abs(ft - t_ms) <= 8000 for ft in fight_times[q.pid][:]) if s % 2 == 0 else False
+                    burst = 6.0 if near_fight else 1.0
+                    champ_d = dmg_rate[q.cls] * (0.4 + s / 900.0) * burst * q.skill * rng.uniform(0.6, 1.4)
+                    farm_d = (55 if q.pos == "JUNGLE" else 40) * (0.5 + s / 1200.0) * rng.uniform(0.7, 1.3)
+                    mf = 0.8 if q.cls in magic_cls else 0.12
+                    q.dmg["mc"] += champ_d * mf
+                    q.dmg["pc"] += champ_d * (1 - mf) * 0.94
+                    q.dmg["tc"] += champ_d * (1 - mf) * 0.06
+                    q.dmg["md"] += (champ_d + farm_d) * mf
+                    q.dmg["pd"] += (champ_d + farm_d) * (1 - mf) * 0.94
+                    q.dmg["td"] += (champ_d + farm_d) * (1 - mf) * 0.06
+                    tk = (12 if q.cls in ("tank", "tank_support") else 7) * (0.4 + s / 1000.0) * burst * rng.uniform(0.5, 1.5)
+                    q.dmg["pt"] += tk * 0.55
+                    q.dmg["mt"] += tk * 0.38
+                    q.dmg["tt"] += tk * 0.07
+                    q.self_mit += tk * (0.9 if q.cls in ("tank", "tank_support") else 0.35)
+                    if near_fight:
+                        q.cc += rng.uniform(0.0, 0.6) * (2 if q.cls in ("tank", "tank_support", "enchanter") else 1)
+                        q.heal += rng.uniform(5, 40)
+                        if q.cls == "enchanter":
+                            q.shield += rng.uniform(20, 70)
+            for kind, ev in idx.get(s, []):
+                if kind == "camp":
+                    q, camp = ev
+                    if q.alive(camp[0] * 1000) and not q.afk:
+                        q.jcs += camp[4]
+                        if camp[1].startswith("SCUTTLE"):
+                            q.scuttles += 1
+                        elif camp[3]:
+                            q.jcs_own += camp[4]
+                        else:
+                            q.jcs_enemy += camp[4]
+                        q.gold += camp[5]
+                        q.xp += camp[6]
+                elif kind == "kill":
+                    v = self.by_pid[ev["victim"]]
+                    vx = 60 + 20 * v.level
+                    if ev["killer"]:
+                        kq = self.by_pid[ev["killer"]]
+                        kq.gold += 300 + ev.get("shutdown", 0) + (100 if ev.get("first_blood") else 0)
+                        kq.xp += vx
+                    for a in ev["assisters"]:
+                        aq = self.by_pid[a]
+                        aq.gold += 150.0 / max(1, len(ev["assisters"])) + 30
+                        aq.xp += vx * 0.6 / max(1, len(ev["assisters"]))
+                elif kind == "obj":
+                    for q in self.team(ev["team"]):
+                        if q.alive(ev["t"]) and not q.afk:
+                            q.xp += {"DRAGON": 100, "BARON_NASHOR": 600, "RIFTHERALD": 120, "HORDE": 40,
+                                     "ATAKHAN": 150}[ev["type"]]
+                            if ev["type"] == "BARON_NASHOR":
+                                q.gold += 300
+                elif kind == "bld":
+                    for q in self.team(300 - ev["team"]):
+                        q.gold += 50
+                    if ev["killer"]:
+                        self.by_pid[ev["killer"]].gold += 150
+                elif kind == "plate":
+                    if ev["killer"]:
+                        self.by_pid[ev["killer"]].gold += 125
+            for q in self.parts:
+                nl = level_for_xp(q.xp)
+                while q.level < nl:
+                    q.level += 1
+                    lt = self.ev_t(t_ms + rng.randint(0, 999))
+                    q.level_times[q.level] = lt
+                    self.level_events.append({"t": lt, "type": "LEVEL_UP", "participantId": q.pid, "level": q.level})
+                q.gold_series[s] = q.gold
+                if s == 600:
+                    q.cs_at_10, q.jcs_at_10 = int(q.cs_f), q.jcs
+                if s in frame_secs:
+                    q.snap[frame_secs[s]] = {
+                        "xp": int(q.xp), "level": q.level, "totalGold": int(q.gold), "cs": int(q.cs_f),
+                        "jcs": q.jcs, "dmg": dict(q.dmg), "cc": q.cc}
+        for q in self.parts:
+            q.gold_series[end_s + 1] = q.gold
+            if end_s < 600:
+                q.cs_at_10, q.jcs_at_10 = int(q.cs_f), q.jcs
+            q.final = q.snap[len(self.frame_ts) - 1]
+
+    def gold_at(self, q, t_ms):
+        s = min(int(t_ms // 1000), len(q.gold_series) - 1)
+        return q.gold_series[s]
+
+    def skill_events(self):
+        rng = self.rng
+        order = [1, 2, 3, 1, 1, 4, 1, 3, 1, 3, 4, 3, 3, 2, 2, 4, 2, 2]
+        evs = []
+        for q in self.parts:
+            if q.afk:
+                continue
+            seq = list(order)
+            first = rng.choice([1, 2, 3])
+            seq[0] = first
+            rest = [x for x in (1, 2, 3) if x != first]
+            seq[1], seq[2] = rest[0], rest[1]
+            for lvl in range(1, q.level + 1):
+                base = q.level_times[lvl] if lvl > 1 else (rng.randint(62000, 84000) if q.pos == "JUNGLE"
+                                                             else rng.randint(30000, 95000))
+                t = self.ev_t(base + rng.randint(150, 4000))
+                evs.append({"t": t, "type": "SKILL_LEVEL_UP", "participantId": q.pid, "skillSlot": seq[lvl - 1],
+                            "levelUpType": "NORMAL"})
+                if q.champ == "Khazix" and lvl in (6, 11, 16):
+                    evs.append({"t": self.ev_t(t + rng.randint(500, 9000)), "type": "SKILL_LEVEL_UP",
+                                "participantId": q.pid, "skillSlot": rng.choice([1, 2, 3, 4]),
+                                "levelUpType": "EVOLVE"})
+        return evs
+
+    # ---------------- kill annotation ----------------
+    def annotate_kills(self):
+        streak = {q.pid: 0 for q in self.parts}
+        last_kill = {}
+        multi = {}
+        self.special = []
+        fb_done = False
+        for k in self.kills:
+            kid, vid = k["killer"], k["victim"]
+            vstreak = streak[vid]
+            k["shutdown"] = 0 if vstreak < 3 else min(700, 150 * (vstreak - 2))
+            k["bounty"] = 300 if vstreak < 2 else 300 + 100 * min(vstreak - 1, 3)
+            k["first_blood"] = False
+            if kid:
+                k["streak_len"] = streak[kid]
+                if not fb_done:
+                    k["first_blood"] = True
+                    k["bounty"] += 100
+                    fb_done = True
+                    self.special.append({"t": k["t"], "type": "CHAMPION_SPECIAL_KILL", "killType": "KILL_FIRST_BLOOD",
+                                         "killerId": kid, "position": k["pos"]})
+                streak[kid] += 1
+                if kid in last_kill and k["t"] - last_kill[kid] <= 10000:
+                    multi[kid] = multi.get(kid, 1) + 1
+                    self.special.append({"t": k["t"], "type": "CHAMPION_SPECIAL_KILL", "killType": "KILL_MULTI",
+                                         "killerId": kid, "multiKillLength": multi[kid], "position": k["pos"]})
+                else:
+                    multi[kid] = 1
+                k["multi"] = multi[kid]
+                last_kill[kid] = k["t"]
+            else:
+                k["streak_len"] = 0
+                k["multi"] = 0
+            streak[vid] = 0
+
+    def dmg_entries(self, srcs, total):
+        rng = self.rng
+        out = []
+        for x in srcs:
+            n = rng.randint(1, 3)
+            mf = 0.8 if x.cls in ("mage", "nidalee", "enchanter") else 0.1
+            for _ in range(n):
+                slot = rng.choice([0, 1, 2, 3, 64, 64])
+                amt = int(total * rng.uniform(0.15, 0.5) / n)
+                out.append({"basic": slot == 64, "magicDamage": int(amt * mf), "name": x.champ,
+                            "participantId": x.pid, "physicalDamage": int(amt * (1 - mf)),
+                            "spellName": x.champ.lower() + ("basicattack" if slot == 64 else "qwer"[slot]),
+                            "spellSlot": slot, "trueDamage": int(amt * 0.05) if rng.random() < 0.3 else 0,
+                            "type": "OTHER"})
+        return out
+
+    # ---------------- items ----------------
+    def plan_items(self):
+        rng = self.rng
+        self.item_events = []
+        self.item_truth = {}
+        for q in self.parts:
+            q.ledger = []          # (t_ms, spent_delta)
+            q.legendary_times = []
+            q.boots_t = None
+            q.slots = [None] * 6   # [item_id, count]
+            q.trinket = 0
+            q.purchased_n = 0
+            q.consumables_n = 0
+            q.control_bought = 0
+            q.control_placed = []
+            q.oracle_t = None
+            q.gold_spent = 0
+            if q.afk:
+                continue
+            evs = []
+
+            def emit(t, typ, **kw):
+                d = {"t": t, "type": typ, "participantId": q.pid}
+                d.update(kw)
+                evs.append(d)
+            legs, boots = BUILDS[q.cls]
+            queue = [legs[0], boots] + legs[1:]
+            if q.pos == "JUNGLE":
+                start = [q.pet, 2003]
+            else:
+                start = STARTERS[q.pos]
+            # shop moments
+            shops = []
+            t0 = rng.randint(900, 18000)
+            emit(self.ev_t(rng.randint(200, 800)), "ITEM_PURCHASED", itemId=3340)
+            q.trinket = 3340
+            q.purchased_n += 1
+            for d0, d1 in q.deaths:
+                if d1 < self.end_ms - 30000:
+                    shops.append(d1 + rng.randint(800, 3500))
+            t = (rng.randint(360, 480) if q.pos == "JUNGLE" else rng.randint(300, 450)) * 1000
+            while t < self.end_ms - 40000:
+                if q.alive(t) and not any(0 <= t - s0 < 150000 for s0 in shops):
+                    shops.append(t)
+                    q.anchors.append((t, self.jitter(FOUNTAIN[q.team], 120)))
+                t += rng.randint(240, 400) * 1000
+            shops = sorted(set(shops))
+            spent = 0.0
+            pot_pending = []
+            ward_pending = []
+            undo_pending = bool(self.plan.get("undo")) and q.is_target
+
+            def inv_count():
+                return sum(1 for s_ in q.slots if s_ is not None)
+
+            def has(iid):
+                return any(s_ is not None and s_[0] == iid for s_ in q.slots)
+
+            def add_item(iid):
+                for s_ in q.slots:
+                    if s_ is not None and s_[0] == iid and iid in (2003, 2055):
+                        s_[1] += 1
+                        return True
+                for i_, s_ in enumerate(q.slots):
+                    if s_ is None:
+                        q.slots[i_] = [iid, 1]
+                        return True
+                return False
+
+            def remove_item(iid):
+                for i_, s_ in enumerate(q.slots):
+                    if s_ is not None and s_[0] == iid:
+                        s_[1] -= 1
+                        if s_[1] <= 0:
+                            q.slots[i_] = None
+                        return True
+                return False
+
+            def cost_of(iid, avail_inv, consumed):
+                total = ITEMS[iid][2]
+                frm = ITEMS[iid][3]
+                c = total - sum(ITEMS[f][2] for f in frm)
+                for f in frm:
+                    if f in avail_inv:
+                        avail_inv.remove(f)
+                        consumed.append(f)
+                    else:
+                        c += cost_of(f, avail_inv, consumed)
+                return c
+
+            def flat_inv():
+                out = []
+                for s_ in q.slots:
+                    if s_ is not None and s_[0] not in (2003, 2055):
+                        out.append(s_[0])
+                return out
+
+            def buy(iid, t_buy, budget):
+                consumed = []
+                c = cost_of(iid, flat_inv(), consumed)
+                if c > budget + 1e-6:
+                    return None
+                # slot check: consumed frees slots
+                free_after = 6 - inv_count() + len(consumed)
+                if free_after < 1 and not (iid in (2003, 2055) and has(iid)):
+                    for sell_id in (1054, 1055, 1056, 2003):
+                        if has(sell_id):
+                            sv = int(round(ITEMS[sell_id][2] * 0.4))
+                            while has(sell_id):
+                                emit(t_buy, "ITEM_SOLD", itemId=sell_id)
+                                remove_item(sell_id)
+                                q.ledger.append((t_buy, -sv))
+                                budget += sv
+                            break
+                    else:
+                        return None
+                    if c > budget:
+                        return None
+                for f in consumed:
+                    remove_item(f)
+                    emit(t_buy, "ITEM_DESTROYED", itemId=f)
+                add_item(iid)
+                emit(t_buy, "ITEM_PURCHASED", itemId=iid)
+                q.ledger.append((t_buy, c))
+                q.gold_spent += c
+                q.purchased_n += 1
+                return c, consumed
+
+            def next_component(goal, budget, inv_list):
+                for f in ITEMS[goal][3]:
+                    if f in inv_list:
+                        inv_list.remove(f)
+                        continue
+                    cc = cost_of(f, list(inv_list), [])
+                    if cc <= budget:
+                        return f
+                    sub = next_component(f, budget, inv_list)
+                    if sub:
+                        return sub
+                return None
+
+            def process_pending(upto):
+                for lst, kind in ((pot_pending, "pot"), (ward_pending, "ward")):
+                    for ct in sorted(lst):
+                        if ct < upto:
+                            lst.remove(ct)
+                            if q.alive(ct) and ct < self.end_ms - 2000:
+                                iid = 2003 if kind == "pot" else 2055
+                                if has(iid):
+                                    remove_item(iid)
+                                    emit(ct, "ITEM_DESTROYED", itemId=iid)
+                                    if kind == "ward":
+                                        q.control_placed.append(ct)
+            # starting purchase
+            tcur = self.ev_t(t0)
+            for iid in start:
+                buy(iid, tcur, 500)
+                if iid == 2003:
+                    pot_pending.append(self.ev_t(tcur + rng.randint(60, 220) * 1000))
+                tcur = self.ev_t(tcur + rng.randint(120, 700))
+            spent_total = lambda: sum(d for _, d in q.ledger)
+            for ts in shops:
+                process_pending(ts)
+                tcur = self.ev_t(ts)
+                avail = self.gold_at(q, tcur) - spent_total()
+                if q.pos in ("JUNGLE", "UTILITY") and q.trinket == 3340:
+                    emit(tcur, "ITEM_DESTROYED", itemId=3340)
+                    emit(tcur, "ITEM_PURCHASED", itemId=3364)
+                    q.trinket = 3364
+                    q.oracle_t = tcur
+                    q.purchased_n += 1
+                    tcur = self.ev_t(tcur + rng.randint(150, 500))
+                guard = 0
+                skip_goal = None
+                while queue and guard < 12:
+                    guard += 1
+                    gi = 1 if queue[0] == skip_goal else 0
+                    if gi >= len(queue):
+                        break
+                    goal = queue[gi]
+                    r = buy(goal, tcur, avail)
+                    if r:
+                        avail -= r[0]
+                        if ITEMS[goal][5] == "legendary":
+                            if undo_pending:
+                                ut = self.ev_t(tcur + rng.randint(2000, 5000))
+                                emit(ut, "ITEM_UNDO", beforeId=goal, afterId=0, goldGain=int(r[0]))
+                                remove_item(goal)
+                                for f in r[1]:
+                                    add_item(f)
+                                q.ledger.append((ut, -r[0]))
+                                q.gold_spent -= r[0]
+                                q.purchased_n -= 1
+                                avail += r[0]
+                                self.item_truth["undo"] = {"participant_id": q.pid, "item_id": goal,
+                                                           "purchase_ts_ms": tcur, "undo_ts_ms": ut,
+                                                           "gold_refunded": int(r[0])}
+                                undo_pending = False
+                                skip_goal = goal
+                                tcur = self.ev_t(ut + rng.randint(300, 900))
+                                continue
+                            q.legendary_times.append((tcur, goal))
+                        else:
+                            q.boots_t = tcur
+                        queue.pop(gi)
+                        tcur = self.ev_t(tcur + rng.randint(150, 600))
+                        continue
+                    comp = next_component(goal, avail, flat_inv())
+                    if not comp:
+                        break
+                    r = buy(comp, tcur, avail)
+                    if not r:
+                        break
+                    avail -= r[0]
+                    tcur = self.ev_t(tcur + rng.randint(150, 600))
+                if avail >= 75 and (q.pos in ("JUNGLE", "UTILITY") or rng.random() < 0.3) and not has(2055):
+                    if buy(2055, tcur, avail):
+                        avail -= 75
+                        q.control_bought += 1
+                        q.consumables_n += 1
+                        ward_pending.append(self.ev_t(tcur + rng.randint(40, 200) * 1000))
+                        tcur = self.ev_t(tcur + rng.randint(150, 600))
+                if tcur < 720000 and avail >= 50 and q.pos != "JUNGLE" and rng.random() < 0.5:
+                    if buy(2003, tcur, avail):
+                        q.consumables_n += 1
+                        pot_pending.append(self.ev_t(tcur + rng.randint(60, 200) * 1000))
+            process_pending(self.end_ms - 2000)
+            q.consumables_n += start.count(2003)
+            if self.plan.get("undo") and q.is_target and q.legendary_times:
+                self.item_truth["first_completed_legendary"] = {"item_id": q.legendary_times[0][1],
+                                                                "ts_ms": q.legendary_times[0][0]}
+            self.item_events.extend(evs)
+        for q in self.parts:
+            if q.is_target:
+                self.item_truth.setdefault("first_completed_legendary",
+                                           {"item_id": q.legendary_times[0][1], "ts_ms": q.legendary_times[0][0]}
+                                           if q.legendary_times else None)
+
+    # ---------------- wards ----------------
+    def plan_wards(self):
+        rng = self.rng
+        self.ward_events = []
+        for q in self.parts:
+            q.wards_placed = 0
+            q.wards_killed = 0
+            q.wards_killed_20 = 0
+            q.control_wards_placed = len(q.control_placed)
+            q.stealth_placed = 0
+            if q.afk:
+                continue
+            for ct in q.control_placed:
+                self.ward_events.append({"t": ct, "type": "WARD_PLACED", "creatorId": q.pid,
+                                         "wardType": "CONTROL_WARD"})
+                q.wards_placed += 1
+            gap = {"UTILITY": (70, 110), "JUNGLE": (120, 200)}.get(q.pos, (150, 260))
+            t = rng.randint(85, 140) * 1000
+            n_undef = 0
+            while t < self.end_ms - 5000:
+                if q.alive(t):
+                    if q.oracle_t is not None and t >= q.oracle_t:
+                        wt = "SIGHT_WARD" if q.pos == "UTILITY" else None
+                    else:
+                        wt = "YELLOW_TRINKET"
+                    if q.pos == "UTILITY" and t > 420000 and rng.random() < 0.5:
+                        wt = "SIGHT_WARD"
+                    if wt and n_undef < 1 and rng.random() < 0.05:
+                        wt, n_undef = "UNDEFINED", 1
+                    if wt:
+                        self.ward_events.append({"t": self.ev_t(t + rng.randint(0, 999)), "type": "WARD_PLACED",
+                                                 "creatorId": q.pid, "wardType": wt})
+                        q.wards_placed += 1
+                        if wt in ("YELLOW_TRINKET", "SIGHT_WARD"):
+                            q.stealth_placed += 1
+                t += rng.randint(*gap) * 1000
+            kg = (140, 280) if q.pos in ("JUNGLE", "UTILITY") else (360, 720)
+            t = (q.oracle_t or 300000) + rng.randint(30, 120) * 1000
+            while t < self.end_ms - 5000:
+                if q.alive(t):
+                    wt = rng.choice(["YELLOW_TRINKET"] * 7 + ["CONTROL_WARD"] * 2 + ["SIGHT_WARD"])
+                    self.ward_events.append({"t": self.ev_t(t + rng.randint(0, 999)), "type": "WARD_KILL",
+                                             "killerId": q.pid, "wardType": wt})
+                    q.wards_killed += 1
+                    if t < 1200000:
+                        q.wards_killed_20 += 1
+                t += rng.randint(*kg) * 1000
+
+    # ---------------- frames / timeline ----------------
+    def pos_at(self, q, ts, fi):
+        rng = random.Random("%s-pos-%d-%d-%d" % (self.seed, self.c, q.pid, fi))
+        fx, fy = FOUNTAIN[q.team]
+        if ts == 0 or q.afk:
+            return clamp_pos(fx + (q.pid % 5) * 45 - 90, fy + (q.pid % 3) * 45 - 45)
+        if not q.alive(ts):
+            return clamp_pos(fx + rng.uniform(-60, 60), fy + rng.uniform(-60, 60))
+        best = None
+        for at, ap in q.anchors:
+            d = abs(at - ts)
+            if d <= 45000 and (best is None or d < best[0]):
+                best = (d, ap)
+        if best:
+            return clamp_pos(best[1][0] + rng.uniform(-200, 200), best[1][1] + rng.uniform(-200, 200))
+        if q.pos == "JUNGLE":
+            camp = CAMPS[q.team][rng.choice(sorted(CAMPS[q.team]))]
+            return clamp_pos(camp[0] + rng.uniform(-500, 500), camp[1] + rng.uniform(-500, 500))
+        lane = LANE_OF_POSITION[q.pos]
+        if ts <= 90000:
+            p = lane_point(lane, 0.33 if q.team == 100 else 0.67)
+            return clamp_pos(p[0] + rng.uniform(-300, 300), p[1] + rng.uniform(-300, 300))
+        if ts >= 840000 and rng.random() < 0.5:
+            lane = rng.choice(["TOP", "MIDDLE", "BOTTOM"])
+        s = 0.5 + 0.06 * math.sin(ts / 170000.0 + self.lane_phase[lane]) + (-0.03 if q.team == 100 else 0.03)
+        if q.pos == "UTILITY":
+            s += -0.01 if q.team == 100 else 0.01
+        p = lane_point(lane, s)
+        return clamp_pos(p[0] + rng.uniform(-350, 350), p[1] + rng.uniform(-350, 350))
+
+    def champ_stats(self, q, lvl, ts, alive, fi):
+        rng = random.Random("%s-cs-%d-%d-%d" % (self.seed, self.c, q.pid, fi))
+        nl = sum(1 for t, _ in q.legendary_times if t <= ts) if hasattr(q, "legendary_times") else 0
+        boots = getattr(q, "boots_t", None) is not None and q.boots_t <= ts
+        ap_cls = q.cls in ("mage", "nidalee", "enchanter")
+        hm = int(600 + 105 * (lvl - 1) + 220 * nl)
+        partype = CHAMPIONS[q.champ][6]
+        if partype in ("None", "Flow", "BloodWell", "Fury", "Heat"):
+            pmax = 0 if partype in ("None", "BloodWell") else 100
+        elif partype == "Energy":
+            pmax = 200
+        else:
+            pmax = int(320 + 52 * (lvl - 1) + (300 * nl if ap_cls else 0))
+        return {
+            "abilityHaste": 10 * nl, "abilityPower": (int(70 * nl + 8 * lvl) if ap_cls else 0),
+            "armor": int(33 + 4.7 * (lvl - 1) + (25 if q.cls in ("tank", "tank_support") else 8) * nl),
+            "armorPen": 0, "armorPenPercent": 0,
+            "attackDamage": int(60 + 3.4 * (lvl - 1) + (0 if ap_cls else 35 * nl)),
+            "attackSpeed": int(100 + 2.5 * (lvl - 1) + (15 * nl if q.cls == "marksman" else 0)),
+            "bonusArmorPenPercent": 0, "bonusMagicPenPercent": 0, "ccReduction": 0, "cooldownReduction": 0,
+            "health": int(hm * rng.uniform(0.3, 1.0)) if alive else 0, "healthMax": hm,
+            "healthRegen": int(8 + 0.8 * (lvl - 1)), "lifesteal": 0, "magicPen": 0, "magicPenPercent": 0,
+            "magicResist": int(32 + 2.05 * (lvl - 1)),
+            "movementSpeed": (345 + (45 if boots else 0)) if alive else 0, "omnivamp": 0, "physicalVamp": 0,
+            "power": int(pmax * rng.uniform(0.2, 1.0)) if alive else 0, "powerMax": pmax,
+            "powerRegen": 0 if pmax == 0 else 8, "spellVamp": 0,
+        }
+
+    def build_timeline(self):
+        frames = []
+        n = len(self.frame_ts)
+        for fi, ts in enumerate(self.frame_ts):
+            pfs = {}
+            for q in self.parts:
+                snap = q.snap[fi]
+                spent = sum(d for t, d in getattr(q, "ledger", []) if t <= ts)
+                d = snap["dmg"]
+                dm = {k: int(v) for k, v in d.items()}
+                x, y = self.pos_at(q, ts, fi)
+                pfs[str(q.pid)] = {
+                    "championStats": self.champ_stats(q, snap["level"], ts, q.alive(ts), fi),
+                    "currentGold": int(snap["totalGold"] - spent),
+                    "damageStats": {
+                        "magicDamageDone": dm["md"], "magicDamageDoneToChampions": dm["mc"],
+                        "magicDamageTaken": dm["mt"], "physicalDamageDone": dm["pd"],
+                        "physicalDamageDoneToChampions": dm["pc"], "physicalDamageTaken": dm["pt"],
+                        "totalDamageDone": dm["md"] + dm["pd"] + dm["td"],
+                        "totalDamageDoneToChampions": dm["mc"] + dm["pc"] + dm["tc"],
+                        "totalDamageTaken": dm["mt"] + dm["pt"] + dm["tt"],
+                        "trueDamageDone": dm["td"], "trueDamageDoneToChampions": dm["tc"],
+                        "trueDamageTaken": dm["tt"]},
+                    "goldPerSecond": 0,
+                    "jungleMinionsKilled": snap["jcs"],
+                    "level": snap["level"],
+                    "minionsKilled": snap["cs"],
+                    "participantId": q.pid,
+                    "position": {"x": x, "y": y},
+                    "timeEnemySpentControlled": int(snap["cc"] * 1000) // 1000,
+                    "totalGold": snap["totalGold"],
+                    "xp": snap["xp"],
+                }
+            frames.append({"events": [], "participantFrames": pfs, "timestamp": ts})
+        evs = self.collect_events()
+        for e in evs:
+            t = e["timestamp"]
+            k = 0 if t == 0 else min(n - 1, -(-t // 60000))
+            frames[k]["events"].append(e)
+        self.frames = frames
+        return {
+            "metadata": {"dataVersion": "2", "matchId": self.match_id, "participants": [q.puuid for q in self.parts]},
+            "info": {"endOfGameResult": "GameComplete", "frameInterval": 60000, "frames": frames,
+                     "gameId": self.game_id,
+                     "participants": [{"participantId": q.pid, "puuid": q.puuid} for q in self.parts]},
+        }
+
+    def collect_events(self):
+        rng = self.rng
+        out = []
+
+        def pos(p):
+            return {"x": int(p[0]), "y": int(p[1])}
+        out.append({"realTimestamp": self.start_ms, "timestamp": 0, "type": "PAUSE_END"})
+        for k in self.kills:
+            v = self.by_pid[k["victim"]]
+            srcs = [self.by_pid[x] for x in ([k["killer"]] if k["killer"] else []) + k["assisters"]]
+            total = 400 + 90 * v.level
+            recv = self.dmg_entries(srcs, total)
+            if not k["killer"]:
+                recv.append({"basic": True, "magicDamage": 0, "name": "Turret_T%d_L_03_A" % (2 if v.team == 100 else 1),
+                             "participantId": 0, "physicalDamage": int(total * 0.8), "spellName": "turretbasicattack",
+                             "spellSlot": 0, "trueDamage": 0, "type": "TOWER"})
+                recv.append({"basic": True, "magicDamage": 0,
+                             "name": "SRU_%sMinionMelee" % ("Chaos" if v.team == 100 else "Order"),
+                             "participantId": 0, "physicalDamage": 25, "spellName": "minionbasicattack",
+                             "spellSlot": 0, "trueDamage": 0, "type": "MINION"})
+            dealt = self.dmg_entries([v], total * 0.6) if srcs else []
+            e = {"bounty": k["bounty"], "killStreakLength": k["streak_len"], "killerId": k["killer"],
+                 "position": pos(k["pos"]), "shutdownBounty": k["shutdown"], "timestamp": k["t"],
+                 "type": "CHAMPION_KILL", "victimDamageDealt": dealt, "victimDamageReceived": recv,
+                 "victimId": k["victim"]}
+            if k["assisters"]:
+                e["assistingParticipantIds"] = list(k["assisters"])
+            out.append(e)
+        for s_ in self.special:
+            e = {"killType": s_["killType"], "killerId": s_["killerId"], "position": pos(s_["position"]),
+                 "timestamp": s_["t"], "type": s_["type"]}
+            if "multiKillLength" in s_:
+                e["multiKillLength"] = s_["multiKillLength"]
+            out.append(e)
+        soul_names = {"FIRE_DRAGON": "Infernal", "AIR_DRAGON": "Cloud", "EARTH_DRAGON": "Mountain",
+                      "WATER_DRAGON": "Ocean", "HEXTECH_DRAGON": "Hextech", "CHEMTECH_DRAGON": "Chemtech"}
+        dcount = {100: 0, 200: 0}
+        for o in self.objectives:
+            e = {"bounty": 0, "killerId": o["killer"], "killerTeamId": o["team"], "monsterType": o["type"],
+                 "position": pos(o["pos"]), "timestamp": o["t"], "type": "ELITE_MONSTER_KILL"}
+            if o["subtype"]:
+                e["monsterSubType"] = o["subtype"]
+            if o["assisters"]:
+                e["assistingParticipantIds"] = list(o["assisters"])
+            out.append(e)
+            if o["type"] == "DRAGON" and o["subtype"] != "ELDER_DRAGON":
+                dcount[o["team"]] += 1
+                if dcount[o["team"]] == 4:
+                    out.append({"name": soul_names.get(o["subtype"], "Infernal"), "teamId": o["team"],
+                                "timestamp": o["t"] + 1, "type": "DRAGON_SOUL_GIVEN"})
+        tower_type = {0: "OUTER_TURRET", 1: "INNER_TURRET", 2: "BASE_TURRET"}
+        for b in self.buildings:
+            e = {"bounty": 0, "killerId": b["killer"], "laneType": LANE_TYPE[b["lane"]], "position": pos(b["pos"]),
+                 "teamId": b["team"], "timestamp": b["t"], "type": "BUILDING_KILL"}
+            if b["kind"] == "INHIB":
+                e["buildingType"] = "INHIBITOR_BUILDING"
+            else:
+                e["buildingType"] = "TOWER_BUILDING"
+                e["towerType"] = "NEXUS_TURRET" if b["kind"] == "NEXUS" else tower_type[b["tier"]]
+            if b["assisters"]:
+                e["assistingParticipantIds"] = list(b["assisters"])
+            out.append(e)
+        for pl in self.plates:
+            out.append({"killerId": pl["killer"], "laneType": LANE_TYPE[pl["lane"]], "position": pos(pl["pos"]),
+                        "teamId": pl["team"], "timestamp": pl["t"], "type": "TURRET_PLATE_DESTROYED"})
+        for lst in (self.item_events, self.ward_events, self.level_events, self.skill_evs):
+            for ev in lst:
+                e = {k: v for k, v in ev.items() if k != "t"}
+                e["timestamp"] = ev["t"]
+                out.append(e)
+        out.append({"gameId": self.game_id, "realTimestamp": self.start_ms + self.end_ms + 1234,
+                    "timestamp": self.end_ms, "type": "GAME_END", "winningTeam": self.win_team})
+        out.sort(key=lambda e: e["timestamp"])
+        return [dict(sorted(e.items())) for e in out]
+
+    # ---------------- match DTO ----------------
+    def kill_stats(self, q):
+        streak, best, sprees, multi_best = 0, 0, 0, 0
+        chains = {2: 0, 3: 0, 4: 0, 5: 0}
+        cur_chain = 0
+        for k in self.kills:
+            if k["killer"] == q.pid:
+                streak += 1
+                best = max(best, streak)
+                if streak == 3:
+                    sprees += 1
+                if k["multi"] >= 2:
+                    cur_chain = k["multi"]
+                else:
+                    if cur_chain >= 2:
+                        chains[min(cur_chain, 5)] += 1
+                    cur_chain = 1
+                multi_best = max(multi_best, k["multi"])
+            if k["victim"] == q.pid:
+                streak = 0
+        if cur_chain >= 2:
+            chains[min(cur_chain, 5)] += 1
+        return {"largestKillingSpree": best if best >= 2 else 0, "killingSprees": sprees,
+                "largestMultiKill": multi_best, "doubleKills": chains[2], "tripleKills": chains[3],
+                "quadraKills": chains[4], "pentaKills": chains[5]}
+
+    def build_match(self):
+        rng = self.rng
+        dur = self.duration_s
+        dmin = dur / 60.0
+        kills = self.kills
+        fb = next((k for k in kills if k["killer"]), None)
+        fb_team = self.by_pid[fb["killer"]].team if fb else None
+        towers = [b for b in self.buildings if b["kind"] in ("TOWER", "NEXUS")]
+        first_tower = towers[0] if towers else None
+        team_k = {t: self.team_kills(t) for t in (100, 200)}
+        champ_dmg = {q.pid: int(q.final["dmg"]["mc"]) + int(q.final["dmg"]["pc"]) + int(q.final["dmg"]["tc"])
+                     for q in self.parts}
+        taken = {q.pid: int(q.final["dmg"]["mt"]) + int(q.final["dmg"]["pt"]) + int(q.final["dmg"]["tt"])
+                 for q in self.parts}
+        team_dmg = {t: max(1, sum(champ_dmg[q.pid] for q in self.team(t))) for t in (100, 200)}
+        team_taken = {t: max(1, sum(taken[q.pid] for q in self.team(t))) for t in (100, 200)}
+        objs = self.objectives
+        tree_of = {"lee": "fighter", "viego": "fighter", "xin": "fighter", "fighter": "fighter",
+                   "assassin": "assassin", "nidalee": "assassin", "mage": "mage", "enchanter": "mage",
+                   "marksman": "marksman", "tank": "tank", "tank_support": "tank"}
+        participants = []
+        for q in self.parts:
+            kk, dd, aa = self.count(q, "k"), self.count(q, "d"), self.count(q, "a")
+            ks = self.kill_stats(q)
+            fin = q.final
+            fd = {k: int(v) for k, v in fin["dmg"].items()}
+            spent = int(getattr(q, "gold_spent", 0))
+            dead = sum(min(b, self.end_ms) - a for a, b in q.deaths) // 1000
+            lives, prev = [], 0
+            for a, b in q.deaths:
+                lives.append(a - prev)
+                prev = b
+            lives.append(self.end_ms - prev)
+            my_objs = [o for o in objs if o["killer"] == q.pid]
+            take_objs = [o for o in objs if o["killer"] == q.pid or q.pid in o["assisters"]]
+            my_bld = [b for b in self.buildings if b["killer"] == q.pid]
+            take_bld = [b for b in self.buildings if b["killer"] == q.pid or q.pid in b["assisters"]]
+            lost_bld = [b for b in self.buildings if b["team"] == q.team]
+            slots = getattr(q, "slots", [None] * 6)
+            items = [s_[0] if s_ else 0 for s_ in slots]
+            trinket = getattr(q, "trinket", 0)
+            primary, prim_perks, sub, sub_perks = RUNE_TREES[tree_of[q.cls]]
+            dragon_t = [o["t"] for o in take_objs if o["type"] == "DRAGON"]
+            won = q.team == self.win_team
+            position = "" if self.remake else q.pos
+            ind_pos = "Invalid" if self.remake else q.pos
+            if self.c == 7 and q.pid == (8 if self.tside == 100 else 3):
+                ind_pos = "Invalid"
+            pd = {
+                "allInPings": rng.randint(0, 3), "assistMePings": rng.randint(0, 4), "assists": aa,
+                "baitPings": 0, "baronKills": sum(1 for o in my_objs if o["type"] == "BARON_NASHOR"),
+                "basicPings": 0, "bountyLevel": 0, "champExperience": fin["xp"], "champLevel": fin["level"],
+                "championId": CHAMPIONS[q.champ][0], "championName": q.champ, "championTransform": 0,
+                "commandPings": rng.randint(0, 12), "consumablesPurchased": getattr(q, "consumables_n", 0),
+                "damageDealtToBuildings": 900 * len(take_bld) + rng.randint(0, 1500) if not q.afk else 0,
+                "damageDealtToEpicMonsters": (sum(9000 if o["type"] == "BARON_NASHOR" else 3500 for o in take_objs)
+                                              if not q.afk else 0),
+                "damageDealtToObjectives": 3000 * len(take_objs) + 900 * len(take_bld),
+                "damageDealtToTurrets": 900 * len(take_bld), "damageSelfMitigated": int(q.self_mit),
+                "dangerPings": 0, "deaths": dd, "detectorWardsPlaced": getattr(q, "control_wards_placed", 0),
+                "eligibleForProgression": True, "enemyMissingPings": rng.randint(0, 6),
+                "enemyVisionPings": rng.randint(0, 5),
+                "firstBloodAssist": bool(fb and q.pid in fb["assisters"]),
+                "firstBloodKill": bool(fb and fb["killer"] == q.pid),
+                "firstTowerAssist": bool(first_tower and q.pid in first_tower["assisters"]),
+                "firstTowerKill": bool(first_tower and first_tower["killer"] == q.pid),
+                "gameEndedInEarlySurrender": self.remake, "gameEndedInSurrender": self.surrender,
+                "getBackPings": rng.randint(0, 3), "goldEarned": fin["totalGold"], "goldSpent": spent,
+                "holdPings": 0, "individualPosition": ind_pos,
+                "inhibitorKills": sum(1 for b in my_bld if b["kind"] == "INHIB"),
+                "inhibitorTakedowns": sum(1 for b in take_bld if b["kind"] == "INHIB"),
+                "inhibitorsLost": sum(1 for b in lost_bld if b["kind"] == "INHIB"),
+                "itemsPurchased": getattr(q, "purchased_n", 0), "killingSprees": ks["killingSprees"],
+                "kills": kk, "lane": "NONE" if self.remake else LANE_FIELD[q.pos],
+                "largestCriticalStrike": rng.randint(0, 900) if q.cls == "marksman" else 0,
+                "largestKillingSpree": ks["largestKillingSpree"], "largestMultiKill": ks["largestMultiKill"],
+                "longestTimeSpentLiving": (max(lives) // 1000) if dd else 0,
+                "magicDamageDealt": fd["md"], "magicDamageDealtToChampions": fd["mc"],
+                "magicDamageTaken": fd["mt"],
+                "missions": {"playerScore%d" % i: 0 for i in range(12)},
+                "needVisionPings": rng.randint(0, 3), "neutralMinionsKilled": fin["jcs"],
+                "nexusKills": 1 if (won and not self.surrender and not self.remake and q.pos == "MIDDLE") else 0,
+                "nexusLost": 1 if (not won and not self.surrender and not self.remake) else 0,
+                "nexusTakedowns": 1 if (won and not self.surrender and not self.remake) else 0,
+                "objectivesStolen": sum(1 for o in my_objs if o["stolen"]), "objectivesStolenAssists": 0,
+                "onMyWayPings": rng.randint(0, 8), "participantId": q.pid,
+                "pentaKills": ks["pentaKills"],
+                "perks": {"statPerks": {"defense": 5011, "flex": 5008, "offense": rng.choice([5005, 5008])},
+                          "styles": [{"description": "primaryStyle", "style": primary,
+                                      "selections": [{"perk": pk, "var1": rng.randint(0, 1500),
+                                                      "var2": rng.randint(0, 60), "var3": 0} for pk in prim_perks]},
+                                     {"description": "subStyle", "style": sub,
+                                      "selections": [{"perk": pk, "var1": rng.randint(0, 500),
+                                                      "var2": 0, "var3": 0} for pk in sub_perks]}]},
+                "physicalDamageDealt": fd["pd"], "physicalDamageDealtToChampions": fd["pc"],
+                "physicalDamageTaken": fd["pt"], "placement": 0,
+                "playerAugment1": 0, "playerAugment2": 0, "playerAugment3": 0, "playerAugment4": 0,
+                "playerAugment5": 0, "playerAugment6": 0, "playerSubteamId": 0,
+                "profileIcon": q.profile_icon, "pushPings": 0, "puuid": q.puuid,
+                "quadraKills": ks["quadraKills"], "retreatPings": rng.randint(0, 2),
+                "riotIdGameName": q.game_name, "riotIdTagline": q.tag,
+                "role": "NONE" if self.remake else ROLE_LANE[q.pos],
+                "sightWardsBoughtInGame": 0,
+                "spell1Casts": int(dmin * rng.uniform(4, 9)) if not q.afk else 0,
+                "spell2Casts": int(dmin * rng.uniform(2, 5)) if not q.afk else 0,
+                "spell3Casts": int(dmin * rng.uniform(2, 6)) if not q.afk else 0,
+                "spell4Casts": int(dmin * rng.uniform(0.2, 0.6)) if not q.afk else 0,
+                "subteamPlacement": 0,
+                "summoner1Casts": 0 if q.afk else (fin["jcs"] // 4 if q.spells[0] == SPELL_SMITE else rng.randint(1, 6)),
+                "summoner1Id": q.spells[0],
+                "summoner2Casts": 0 if q.afk else (fin["jcs"] // 4 if q.spells[1] == SPELL_SMITE else rng.randint(1, 6)),
+                "summoner2Id": q.spells[1], "summonerId": q.summoner_id, "summonerLevel": q.summoner_level,
+                "summonerName": "",
+                "teamEarlySurrendered": self.remake and q.team == self.tside,
+                "teamId": q.team, "teamPosition": position, "timeCCingOthers": int(q.cc),
+                "timePlayed": dur, "totalAllyJungleMinionsKilled": q.jcs_own,
+                "totalDamageDealt": fd["md"] + fd["pd"] + fd["td"],
+                "totalDamageDealtToChampions": champ_dmg[q.pid], "totalDamageShieldedOnTeammates": int(q.shield),
+                "totalDamageTaken": taken[q.pid], "totalEnemyJungleMinionsKilled": q.jcs_enemy,
+                "totalHeal": int(q.heal * 10), "totalHealsOnTeammates": int(q.heal * (4 if q.cls == "enchanter" else 0.2)),
+                "totalMinionsKilled": fin["cs"], "totalTimeCCDealt": int(q.cc * 3),
+                "totalTimeSpentDead": int(dead), "totalUnitsHealed": 1 + (4 if q.cls == "enchanter" else 0),
+                "tripleKills": ks["tripleKills"], "trueDamageDealt": fd["td"],
+                "trueDamageDealtToChampions": fd["tc"], "trueDamageTaken": fd["tt"],
+                "turretKills": sum(1 for b in my_bld if b["kind"] != "INHIB"),
+                "turretTakedowns": sum(1 for b in take_bld if b["kind"] != "INHIB"),
+                "turretsLost": sum(1 for b in lost_bld if b["kind"] != "INHIB"),
+                "unrealKills": 0, "visionClearedPings": 0,
+                "visionScore": 0, "visionWardsBoughtInGame": getattr(q, "control_bought", 0),
+                "wardsKilled": q.wards_killed, "wardsPlaced": q.wards_placed, "win": won,
+                "doubleKills": ks["doubleKills"],
+                "dragonKills": sum(1 for o in my_objs if o["type"] == "DRAGON"),
+            }
+            for i in range(7):
+                pd["item%d" % i] = items[i] if i < 6 else trinket
+            for i in range(12):
+                pd["PlayerScore%d" % i] = 0
+            vs = int(q.wards_placed * 1.1 + q.wards_killed * 1.6 + q.control_wards_placed * 1.2 + dmin * 0.15)
+            pd["visionScore"] = 0 if q.afk else vs
+            if not self.plan.get("no_challenges"):
+                pd["challenges"] = self.challenges(q, pd, team_k, team_dmg, team_taken, take_objs, dragon_t,
+                                                   take_bld, first_tower)
+            participants.append(dict(sorted(pd.items())))
+        teams = []
+        used_ids = {CHAMPIONS[q.champ][0] for q in self.parts}
+        pool = [v[0] for v in CHAMPIONS.values() if v[0] not in used_ids] + [17, 63, 99, 119, 141, 147, 350, 555, 799, 893, 901, 910]
+        rng.shuffle(pool)
+        epic_types = ("DRAGON", "BARON_NASHOR", "RIFTHERALD", "ATAKHAN")
+        for team in (100, 200):
+            def ob(mtype):
+                lst = [o for o in objs if o["type"] == mtype]
+                return {"first": bool(lst) and lst[0]["team"] == team, "kills": sum(1 for o in lst if o["team"] == team)}
+            inhibs = [b for b in self.buildings if b["kind"] == "INHIB"]
+            n_epic = sum(1 for o in objs if o["team"] == team and o["type"] in epic_types)
+            bans = []
+            for i in range(5):
+                bans.append({"championId": pool.pop() if rng.random() > 0.05 else -1,
+                             "pickTurn": i + 1 + (0 if team == 100 else 5)})
+            teams.append({
+                "bans": bans,
+                "feats": {"EPIC_MONSTER_KILL": {"featState": min(3, n_epic)},
+                          "FIRST_BLOOD": {"featState": 1 if fb_team == team else 0},
+                          "FIRST_TURRET": {"featState": 1 if (first_tower and first_tower["team"] != team) else 0}},
+                "objectives": {
+                    "atakhan": ob("ATAKHAN"), "baron": ob("BARON_NASHOR"),
+                    "champion": {"first": fb_team == team, "kills": team_k[team]},
+                    "dragon": ob("DRAGON"), "horde": ob("HORDE"),
+                    "inhibitor": {"first": bool(inhibs) and inhibs[0]["team"] != team,
+                                  "kills": sum(1 for b in inhibs if b["team"] != team)},
+                    "riftHerald": ob("RIFTHERALD"),
+                    "tower": {"first": bool(first_tower) and first_tower["team"] != team,
+                              "kills": sum(1 for b in towers if b["team"] != team)}},
+                "teamId": team, "win": team == self.win_team})
+        info = {
+            "endOfGameResult": "GameComplete", "gameCreation": self.start_ms - rng.randint(40000, 90000),
+            "gameDuration": dur, "gameEndTimestamp": self.start_ms + self.end_ms + 1234, "gameId": self.game_id,
+            "gameMode": "CLASSIC", "gameName": "teambuilder-match-%d" % self.game_id,
+            "gameStartTimestamp": self.start_ms, "gameType": "MATCHED_GAME",
+            "gameVersion": GAME_VERSION_BY_PATCH[self.patch], "mapId": 11, "participants": participants,
+            "platformId": "EUW1", "queueId": QUEUE, "teams": teams, "tournamentCode": ""}
+        return {"metadata": {"dataVersion": "2", "matchId": self.match_id,
+                             "participants": [q.puuid for q in self.parts]}, "info": info}
+
+    def challenges(self, q, pd, team_k, team_dmg, team_taken, take_objs, dragon_t, take_bld, first_tower):
+        rng = self.rng
+        dmin = max(1.0, self.duration_s / 60.0)
+        k, d, a = pd["kills"], pd["deaths"], pd["assists"]
+        early = [x for x in self.kills if x["t"] < 600000]
+        opening = self.openings[q.team]
+        my_kills = [x for x in self.kills if x["killer"] == q.pid]
+        ch = {
+            "12AssistStreakCount": 0, "abilityUses": pd["spell1Casts"] + pd["spell2Casts"] + pd["spell3Casts"] + pd["spell4Casts"],
+            "acesBefore15Minutes": 0, "alliedJungleMonsterKills": float(q.jcs_own),
+            "baronTakedowns": sum(1 for o in take_objs if o["type"] == "BARON_NASHOR"),
+            "blastConeOppositeOpponentCount": 0, "bountyGold": float(sum(x["shutdown"] for x in my_kills)),
+            "buffsStolen": sum(1 for c_ in q.camps if not c_[3] and c_[1] in ("RED", "BLUE") and q.alive(c_[0] * 1000)),
+            "completeSupportQuestInTime": 1 if q.pos == "UTILITY" else 0,
+            "controlWardsPlaced": q.control_wards_placed,
+            "damagePerMinute": pd["totalDamageDealtToChampions"] / dmin,
+            "damageTakenOnTeamPercentage": pd["totalDamageTaken"] / float(team_taken[q.team]),
+            "dancedWithRiftHerald": 0, "deathsByEnemyChamps": sum(1 for x in self.kills if x["victim"] == q.pid and x["killer"]),
+            "dodgeSkillShotsSmallWindow": rng.randint(0, 25), "doubleAces": 0,
+            "dragonTakedowns": sum(1 for o in take_objs if o["type"] == "DRAGON"),
+            "effectiveHealAndShielding": float(int(q.shield)), "elderDragonKillsWithOpposingSoul": 0,
+            "elderDragonMultikills": 0, "enemyChampionImmobilizations": rng.randint(0, 30),
+            "enemyJungleMonsterKills": float(q.jcs_enemy), "epicMonsterKillsNearEnemyJungler": 0,
+            "epicMonsterKillsWithin30SecondsOfSpawn": 0,
+            "epicMonsterSteals": sum(1 for o in take_objs if o["stolen"] and o["killer"] == q.pid),
+            "epicMonsterStolenWithoutSmite": 0, "firstTurretKilled": 1 if (first_tower and first_tower["killer"] == q.pid) else 0,
+            "flawlessAces": 0, "fullTeamTakedown": 0, "gameLength": float(self.end_ms / 1000.0),
+            "goldPerMinute": pd["goldEarned"] / dmin, "hadOpenNexus": 0, "immobilizeAndKillWithAlly": rng.randint(0, 8),
+            "initialBuffCount": sum(1 for st in opening["path"] if st["step"] in ("RED", "BLUE") and st["ts_ms"] < 240000)
+            if q.pos == "JUNGLE" else 0,
+            "initialCrabCount": sum(1 for st in opening["path"] if st["step"].startswith("SCUTTLE"))
+            if q.pos == "JUNGLE" else 0,
+            "jungleCsBefore10Minutes": float(q.jcs_at_10), "junglerTakedownsNearDamagedEpicMonster": 0,
+            "kTurretsDestroyedBeforePlatesFall": 0,
+            "kda": (k + a) / float(max(1, d)),
+            "killAfterHiddenWithAlly": rng.randint(0, 4),
+            "killParticipation": (k + a) / float(team_k[q.team]) if team_k[q.team] else 0.0,
+            "killedChampTookFullTeamDamageSurvived": 0, "killingSprees": pd["killingSprees"],
+            "killsNearEnemyTurret": rng.randint(0, 2), "killsOnRecentlyHealedByAramPack": 0,
+            "killsUnderOwnTurret": rng.randint(0, 2), "killsWithHelpFromEpicMonster": 0,
+            "knockEnemyIntoTeamAndKill": 0, "landSkillShotsEarlyGame": rng.randint(0, 20),
+            "laneMinionsFirst10Minutes": q.cs_at_10, "laningPhaseGoldExpAdvantage": rng.choice([0, 1]),
+            "earlyLaningPhaseGoldExpAdvantage": rng.choice([0, 1]),
+            "legendaryCount": len(getattr(q, "legendary_times", [])),
+            "legendaryItemUsed": [it for _, it in getattr(q, "legendary_times", [])],
+            "lostAnInhibitor": 1 if pd["inhibitorsLost"] else 0,
+            "maxCsAdvantageOnLaneOpponent": float(rng.randint(-20, 40)), "maxKillDeficit": rng.randint(0, 6),
+            "maxLevelLeadLaneOpponent": rng.randint(0, 3), "mejaisFullStackInTime": 0,
+            "moreEnemyJungleThanOpponent": float(rng.randint(-10, 20)) if q.pos == "JUNGLE" else 0.0,
+            "multiKillOneSpell": 0, "multikills": sum(1 for x in my_kills if x["multi"] == 2),
+            "multikillsAfterAggressiveFlash": 0, "outerTurretExecutesBefore10Minutes": 0,
+            "outnumberedKills": rng.randint(0, 2), "outnumberedNexusKill": 0, "perfectDragonSoulsTaken": 0,
+            "perfectGame": 1 if (d == 0 and pd["win"] and not self.remake) else 0,
+            "pickKillWithAlly": rng.randint(0, k + a + 1), "playedChampSelectPosition": 1, "poroExplosions": 0,
+            "quickCleanse": 0, "quickFirstTurret": 0, "quickSoloKills": 0,
+            "riftHeraldTakedowns": sum(1 for o in take_objs if o["type"] == "RIFTHERALD"),
+            "saveAllyFromDeath": 0, "scuttleCrabKills": q.scuttles, "skillshotsDodged": rng.randint(0, 80),
+            "skillshotsHit": rng.randint(0, 60), "snowballsHit": 0, "soloBaronKills": 0,
+            "soloKills": sum(1 for x in my_kills if not x["assisters"]),
+            "stealthWardsPlaced": q.stealth_placed, "survivedSingleDigitHpCount": 0,
+            "survivedThreeImmobilizesInFight": 0,
+            "takedownOnFirstTurret": 1 if (first_tower and (first_tower["killer"] == q.pid or q.pid in first_tower["assisters"])) else 0,
+            "takedowns": k + a, "takedownsAfterGainingLevelAdvantage": 0,
+            "takedownsBeforeJungleMinionSpawn": sum(1 for x in self.kills if x["t"] < 90000 and (x["killer"] == q.pid or q.pid in x["assisters"])),
+            "takedownsFirstXMinutes": sum(1 for x in early if x["killer"] == q.pid or q.pid in x["assisters"]),
+            "takedownsInAlcove": 0, "takedownsInEnemyFountain": 0,
+            "teamBaronKills": sum(1 for o in self.objectives if o["team"] == q.team and o["type"] == "BARON_NASHOR"),
+            "teamDamagePercentage": pd["totalDamageDealtToChampions"] / float(team_dmg[q.team]),
+            "teamElderDragonKills": sum(1 for o in self.objectives if o["team"] == q.team and o["subtype"] == "ELDER_DRAGON"),
+            "teamRiftHeraldKills": sum(1 for o in self.objectives if o["team"] == q.team and o["type"] == "RIFTHERALD"),
+            "tookLargeDamageSurvived": 0,
+            "turretPlatesTaken": sum(1 for pl in self.plates if pl["killer"] == q.pid),
+            "turretTakedowns": pd["turretTakedowns"], "turretsTakenWithRiftHerald": 0,
+            "twentyMinionsIn3SecondsCount": 0, "twoWardsOneSweeperCount": 0, "unseenRecalls": 0,
+            "visionScoreAdvantageLaneOpponent": float(rng.uniform(-0.5, 0.5)),
+            "visionScorePerMinute": pd["visionScore"] / dmin,
+            "voidMonsterKill": sum(1 for o in self.objectives if o["killer"] == q.pid and o["type"] == "HORDE"),
+            "wardTakedowns": q.wards_killed, "wardTakedownsBefore20M": q.wards_killed_20, "wardsGuarded": 0,
+            "baronBuffGoldAdvantageOverThreshold": 0, "teleportTakedowns": 0,
+            "HealFromMapSources": float(rng.randint(0, 900)), "InfernalScalePickup": 0, "fistBumpParticipation": 0,
+            "highestChampionDamage": 0, "highestCrowdControlScore": 0, "highestWardKills": 0,
+        }
+        if q.pos == "JUNGLE":
+            ch["junglerKillsEarlyJungle"] = sum(1 for x in early if x["killer"] == q.pid
+                                                and self.by_pid[x["victim"]].pos == "JUNGLE")
+            ch["killsOnLanersEarlyJungleAsJungler"] = sum(1 for x in early if x["killer"] == q.pid
+                                                          and self.by_pid[x["victim"]].pos != "JUNGLE")
+        else:
+            ch["getTakedownsInAllLanesEarlyJungleAsLaner"] = 0
+            ch["killsOnOtherLanesEarlyJungleAsLaner"] = 0
+        if dragon_t:
+            ch["earliestDragonTakedown"] = dragon_t[0] / 1000.0
+        if first_tower and first_tower["killer"] == q.pid:
+            ch["firstTurretKilledTime"] = first_tower["t"] / 1000.0
+        if getattr(q, "legendary_times", None):
+            ch["fastestLegendary"] = q.legendary_times[0][0] / 1000.0
+        return dict(sorted(ch.items()))
+
+    # ---------------- orchestration ----------------
+    def build(self):
+        self.start_ms = int(self.start_dt.timestamp() * 1000)
+        self.setup()
+        self.setup_time()
+        self.plan_jungle()
+        self.plan_kills()
+        self.annotate_kills()
+        self.plan_objectives()
+        self.plan_buildings()
+        self.simulate()
+        self.plan_items()
+        self.plan_wards()
+        self.skill_evs = self.skill_events()
+        timeline = self.build_timeline()
+        match = self.build_match()
+        self.truth = self.make_truth(match)
+        return match, timeline
+
+    def make_truth(self, match):
+        tq = self.target
+        info = match["info"]
+        tp = [p for p in info["participants"] if p["puuid"] == TARGET_PUUID][0]
+        enemy = 300 - tq.team
+        ej = self.team_role(enemy, "JUNGLE")
+        lo = self.team_role(enemy, tq.pos)
+        deaths = []
+        for k in self.kills:
+            if k["victim"] == tq.pid and k["t"] < 600000:
+                n_en = (1 if k["killer"] else 0) + len(k["assisters"])
+                z = zone_of(*k["pos"])
+                deaths.append({"ts_ms": k["t"], "position": list(k["pos"]), "killer_id": k["killer"],
+                               "assist_ids": list(k["assisters"]), "enemies_involved": n_en,
+                               "kind": "executed" if not k["killer"] else ("ganked" if n_en >= 2 else "solo"),
+                               "zone": z, "relative_zone": relative_zone(z, tq.team), "injected_as": k["tag"]})
+        path = []
+        for fi, fr in enumerate(self.frames):
+            pf = fr["participantFrames"][str(tq.pid)]
+            x, y = pf["position"]["x"], pf["position"]["y"]
+            path.append({"frame": fi, "ts_ms": fr["timestamp"], "x": x, "y": y, "zone": zone_of(x, y),
+                         "relative_zone": relative_zone(zone_of(x, y), tq.team),
+                         "jungle_cs": pf["jungleMinionsKilled"], "minions": pf["minionsKilled"], "level": pf["level"]})
+        opening = None
+        if tq.pos == "JUNGLE" and not self.remake:
+            o = self.openings[tq.team]
+            camps = [s for s in o["path"] if s["step"] != "GANK"]
+            opening = {"pattern": o["pattern"], "start_camp": o["start_camp"],
+                       "start_half": ("enemy_jungle" if not o["path"][0].get("own_camp") else
+                                      ("top" if o["start_camp"] in TOP_HALF_CAMPS[tq.team] else "bottom")),
+                       "path": o["path"], "opening_end_ms": o["opening_end_ms"],
+                       "camps_before_first_back": len(camps),
+                       "full_clear": o["pattern"] in ("BOT_START_FULLCLEAR_TOP", "TOP_START_FULLCLEAR_BOT"),
+                       "full_clear_done_ms": ([s["ts_ms"] for s in camps if not s["step"].startswith("SCUTTLE")][5]
+                                              if o["pattern"].endswith(("FULLCLEAR_TOP", "FULLCLEAR_BOT")) else None),
+                       "first_gank_ts_ms": o["gank_ts_ms"], "invade": o["invade"],
+                       "first_scuttle": next(({"side": s["step"].split("_")[1], "ts_ms": s["ts_ms"]}
+                                              for s in camps if s["step"].startswith("SCUTTLE")), None)}
+        fb = next((k for k in self.kills if k["killer"]), None)
+        status = self.plan.get("status", "complete")
+        return {
+            "chrono_index": self.c, "status": status, "patch": self.patch,
+            "game_start_utc": iso_z(self.start_dt), "side": tq.team, "participant_id": tq.pid,
+            "team_position": tp["teamPosition"], "planned_role": tq.pos, "champion": tq.champ,
+            "win": tp["win"], "duration_s": info["gameDuration"], "remake": self.remake,
+            "surrender": self.surrender, "has_challenges": "challenges" in tp,
+            "timeline_available": status not in ("timeline_failed", "remake"),
+            "kda": {"kills": tp["kills"], "deaths": tp["deaths"], "assists": tp["assists"]},
+            "cs": {"minions": tp["totalMinionsKilled"], "jungle": tp["neutralMinionsKilled"]},
+            "gold_earned": tp["goldEarned"], "champ_level": tp["champLevel"],
+            "duo_partner_present": any(q.is_duo for q in self.parts),
+            "lane_opponent": {"puuid": lo.puuid, "participant_id": lo.pid, "champion": lo.champ,
+                              "riot_id": "%s#%s" % (lo.game_name, lo.tag), "position": lo.pos},
+            "enemy_jungler": {"puuid": ej.puuid, "participant_id": ej.pid, "champion": ej.champ,
+                              "riot_id": "%s#%s" % (ej.game_name, ej.tag),
+                              "opening_pattern": self.openings[enemy]["pattern"]},
+            "first_blood": {"ts_ms": fb["t"], "killer_id": fb["killer"], "victim_id": fb["victim"],
+                            "target_involved": fb["killer"] == tq.pid or tq.pid in fb["assisters"]} if fb else None,
+            "opening": opening,
+            "ganks_pre10": self.gank_truth,
+            "deaths_pre10": deaths,
+            "hotspot_death": self.hotspot_truth,
+            "executions": self.execute_truth,
+            "objectives": [{"type": o["type"], "subtype": o["subtype"], "ts_ms": o["t"], "team": o["team"],
+                            "killer_id": o["killer"], "target_team": o["team"] == tq.team,
+                            "target_involved": o["killer"] == tq.pid or tq.pid in o["assisters"],
+                            "stolen": o["stolen"]} for o in self.objectives],
+            "first_completed_legendary": self.item_truth.get("first_completed_legendary"),
+            "item_undo": self.item_truth.get("undo"),
+            "target_path_by_frame": path,
+        }
+
+
+MATCH_PLAN[7]["execute_other"] = 1130
+
+
+# --------------------------------------------------------------------------
+# Dataset writer
+# --------------------------------------------------------------------------
+def league_entry(puuid, tier, rank, lp, wins, losses, queue="RANKED_SOLO_5x5"):
+    h = hashlib.md5(("league:" + puuid + queue).encode()).hexdigest()
+    return {"freshBlood": int(h[0], 16) < 2, "hotStreak": int(h[1], 16) < 3, "inactive": False,
+            "leagueId": "%s-%s-%s-%s-%s" % (h[:8], h[8:12], h[12:16], h[16:20], h[20:32]),
+            "leaguePoints": lp, "losses": losses, "puuid": puuid, "queueType": queue,
+            "rank": rank, "tier": tier, "veteran": int(h[2], 16) < 2, "wins": wins}
+
+
+def random_rank_entries(puuid, rng):
+    tier = rng.choice(["EMERALD", "EMERALD", "DIAMOND", "DIAMOND", "DIAMOND", "MASTER"])
+    rank = "I" if tier == "MASTER" else rng.choice(["IV", "III", "II", "I"])
+    lp = rng.randint(0, 180) if tier == "MASTER" else rng.randint(0, 99)
+    w = rng.randint(30, 260)
+    out = [league_entry(puuid, tier, rank, lp, w, w + rng.randint(-25, 25))]
+    if rng.random() < 0.3:
+        out.append(league_entry(puuid, rng.choice(["PLATINUM", "EMERALD"]), rng.choice(["II", "I"]),
+                                rng.randint(0, 99), rng.randint(5, 40), rng.randint(5, 40), "RANKED_FLEX_SR"))
+    return out
+
+
+def dump_json(path, obj, compact=True):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        if compact:
+            json.dump(obj, f, ensure_ascii=False, separators=(",", ":"))
+        else:
+            json.dump(obj, f, ensure_ascii=False, indent=2)
+
+
+def sha256_file(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def generate(out_dir, seed):
+    rng = random.Random("fixture-%s" % seed)
+    out_dir = os.path.abspath(out_dir)
+    if os.path.isdir(out_dir) and os.listdir(out_dir):
+        # only ever wipe a directory that is a previous *synthetic* fixture
+        try:
+            prev = json.load(open(os.path.join(out_dir, "manifest.json"), encoding="utf-8"))
+        except Exception:
+            prev = {}
+        if prev.get("synthetic") is not True:
+            raise SystemExit("refusing to overwrite %s: not empty and not a previous synthetic fixture" % out_dir)
+        shutil.rmtree(out_dir)
+    os.makedirs(out_dir, exist_ok=True)
+    # chronological schedule + ids
+    starts = {}
+    for sdt, idxs in SESSIONS:
+        t = sdt
+        for c in idxs:
+            starts[c] = t
+            t = t + timedelta(seconds=MATCH_PLAN[c]["dur"] + rng.randint(200, 520))
+    num = 7512345678 + rng.randint(0, 99999)
+    ids = {}
+    for c in range(len(MATCH_PLAN)):
+        num += rng.randint(25000, 380000)
+        ids[c] = ("EUW1_%d" % num, num)
+    match_ids_newest = [ids[c][0] for c in reversed(range(len(MATCH_PLAN)))]
+    builders, matches, timelines = {}, {}, {}
+    for c, plan in enumerate(MATCH_PLAN):
+        if plan.get("status") == "match_failed":
+            continue
+        patch = "16.19" if c < 6 else "16.20"
+        mb = MatchBuilder(c, plan, seed, ids[c][0], ids[c][1], starts[c], patch)
+        m, tl = mb.build()
+        builders[c], matches[c], timelines[c] = mb, m, tl
+
+    # ---- simulated download clock / log (mirrors download_riot.py's layout) ----
+    clock = [DOWNLOAD_START]
+    log = ["# SYNTHETIC download log written by tests/make_fixture.py (seed=%s) -- not a real download" % seed]
+    files = {}
+    n_requests = [0]
+
+    def tick(lo=0.4, hi=1.6):
+        clock[0] = clock[0] + timedelta(seconds=rng.uniform(lo, hi))
+        return iso_z(clock[0])
+
+    def put(rel, obj, endpoint, url, raw=None):
+        path = os.path.join(out_dir, rel)
+        if raw is not None:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "wb") as f:
+                f.write(raw)
+        else:
+            dump_json(path, obj)
+        at = tick()
+        n_requests[0] += 1
+        size = os.path.getsize(path)
+        files[rel] = {"downloaded_at_utc": at, "bytes": size, "sha256": sha256_file(path), "endpoint": endpoint}
+        log.append("%s GET %s -> 200 (%d bytes) -> %s" % (at, url, size, rel))
+        return at
+
+    R, P, D = "https://" + RIOT_REGIONAL_HOST, "https://" + RIOT_PLATFORM_HOST, "https://" + DDRAGON_HOST
+    put("account.json", {"puuid": TARGET_PUUID, "gameName": TARGET_GAME_NAME, "tagLine": TARGET_TAG},
+        "account-v1 /riot/account/v1/accounts/by-riot-id/{gameName}/{tagLine}",
+        R + "/riot/account/v1/accounts/by-riot-id/%s/%s" % (TARGET_GAME_NAME, TARGET_TAG))
+    put("account_region.json", {"puuid": TARGET_PUUID, "game": "lol", "region": PLATFORM},
+        "account-v1 /riot/account/v1/region/by-game/lol/by-puuid/{puuid}",
+        R + "/riot/account/v1/region/by-game/lol/by-puuid/" + TARGET_PUUID)
+    target_entries = [league_entry(TARGET_PUUID, "DIAMOND", "II", 47, 112, 98),
+                      league_entry(TARGET_PUUID, "PLATINUM", "I", 23, 14, 11, "RANKED_FLEX_SR")]
+    put("league_entries.json", target_entries, "league-v4 /lol/league/v4/entries/by-puuid/{puuid}",
+        P + "/lol/league/v4/entries/by-puuid/" + TARGET_PUUID)
+    put("match_ids.json", match_ids_newest,
+        "match-v5 /lol/match/v5/matches/by-puuid/{puuid}/ids?queue=%d&start=0&count=%d" % (QUEUE, COUNT),
+        R + "/lol/match/v5/matches/by-puuid/%s/ids?queue=%d&start=0&count=%d" % (TARGET_PUUID, QUEUE, COUNT))
+    mstat, failures = {}, []
+    for c in reversed(range(len(MATCH_PLAN))):
+        mid = ids[c][0]
+        st = MATCH_PLAN[c].get("status", "complete")
+        ent = {"match": "ok", "match_downloaded_at_utc": None, "remake": st == "remake", "timeline": "ok",
+               "timeline_downloaded_at_utc": None, "error": None}
+        if st == "match_failed":
+            for attempt in (1, 2, 3, 4, 5):
+                at = tick(1.0, 3.0)
+                n_requests[0] += 1
+                log.append("%s GET %s/lol/match/v5/matches/%s -> 503 Service Unavailable (attempt %d/5)"
+                           % (at, R, mid, attempt))
+            err = "HTTP 503 Service Unavailable (retries exhausted)"
+            ent = {"match": "failed", "match_error": err, "error": err, "timeline": "skipped",
+                   "match_downloaded_at_utc": None, "timeline_downloaded_at_utc": None}
+            failures.append({"what": "match", "match_id": mid, "error": err, "at_utc": at})
+            mstat[mid] = ent
+            continue
+        ent["match_downloaded_at_utc"] = put("matches/%s.json" % mid, matches[c],
+                                             "match-v5 /lol/match/v5/matches/{matchId}",
+                                             R + "/lol/match/v5/matches/" + mid)
+        if st == "remake":
+            ent["timeline"] = "skipped"
+            log.append("%s   remake: not counted, timeline not downloaded" % iso_z(clock[0]))
+        elif st == "timeline_failed":
+            at = tick()
+            n_requests[0] += 1
+            log.append("%s GET %s/lol/match/v5/matches/%s/timeline -> 404 Not Found" % (at, R, mid))
+            err = "HTTP 404 Not Found (timeline)"
+            ent.update({"timeline": "failed", "timeline_error": err, "error": err})
+            failures.append({"what": "timeline", "match_id": mid, "error": err, "at_utc": at})
+        else:
+            ent["timeline_downloaded_at_utc"] = put("timelines/%s.json" % mid, timelines[c],
+                                                    "match-v5 /lol/match/v5/matches/{matchId}/timeline",
+                                                    R + "/lol/match/v5/matches/%s/timeline" % mid)
+        mstat[mid] = ent
+    # lane opponent ranks: enemy JUNGLE of every match with data, plus the same-position
+    # enemy when the target played another role (that is what the downloader queries)
+    ranks = {}
+    rrng = random.Random("ranks-%s" % seed)
+    for c in sorted(builders, reverse=True):
+        mb = builders[c]
+        opp = [mb.team_role(300 - mb.tside, "JUNGLE")]
+        if mb.target.pos != "JUNGLE":
+            opp.append(mb.team_role(300 - mb.tside, mb.target.pos))
+        for q in opp:
+            if q.puuid in ranks:
+                continue
+            at = tick(0.2, 0.8)
+            n_requests[0] += 1
+            ents = [] if c == 11 else random_rank_entries(q.puuid, rrng)
+            ranks[q.puuid] = {"fetched_at_utc": at, "match_id": mb.match_id, "entries": ents}
+            log.append("%s GET %s/lol/league/v4/entries/by-puuid/%s -> 200" % (at, P, q.puuid))
+    put("lane_opponent_ranks.json", ranks, "league-v4 /lol/league/v4/entries/by-puuid/{puuid} (lane opponents)",
+        P + "/lol/league/v4/entries/by-puuid/{puuid} (x%d)" % len(ranks))
+    # data dragon: latest + every match patch; map/championFull only for latest
+    patches = sorted({mb.patch for mb in builders.values()}, reverse=True)
+    patch_versions = {p: p + ".1" for p in sorted(patches)}
+    versions = [LATEST_VERSION] + [v for v in sorted(patch_versions.values(), reverse=True) if v != LATEST_VERSION]
+    champs = set(TARGET_POOL) | set(EXTRA_DDRAGON_CHAMPS)
+    item_ids = set(ITEMS.keys())
+    for c, m in matches.items():
+        for p in m["info"]["participants"]:
+            champs.add(p["championName"])
+    n_requests[0] += 1
+    for ver in versions:
+        for loc in ("zh_CN", "en_US"):
+            put("ddragon/%s/champion_%s.json" % (ver, loc), ddragon_champion_json(ver, loc, champs),
+                "Data Dragon /cdn/%s/data/%s/champion.json" % (ver, loc), D + "/cdn/%s/data/%s/champion.json" % (ver, loc))
+        for loc in ("zh_CN", "en_US"):
+            put("ddragon/%s/item_%s.json" % (ver, loc), ddragon_item_json(ver, loc, item_ids),
+                "Data Dragon /cdn/%s/data/%s/item.json" % (ver, loc), D + "/cdn/%s/data/%s/item.json" % (ver, loc))
+        if ver == LATEST_VERSION:
+            put("ddragon/%s/map11.png" % ver, None, "Data Dragon /cdn/%s/img/map/map11.png" % ver,
+                D + "/cdn/%s/img/map/map11.png" % ver, raw=make_map_png())
+            for loc in ("zh_CN", "en_US"):
+                put("ddragon/%s/championFull_%s.json" % (ver, loc), ddragon_champion_full_json(ver, loc, champs),
+                    "Data Dragon /cdn/%s/data/%s/championFull.json" % (ver, loc),
+                    D + "/cdn/%s/data/%s/championFull.json" % (ver, loc))
+    put("ddragon/meta.json", {"latest_version": LATEST_VERSION, "versions": versions,
+                              "match_patch_versions": patch_versions, "versions_json_head": ALL_VERSIONS},
+        "Data Dragon /api/versions.json", D + "/api/versions.json")
+    finished = tick()
+    n_ok = sum(1 for e in mstat.values() if e["match"] == "ok")
+    manifest = {
+        "tool": TOOL_NAME, "tool_version": TOOL_VERSION, "synthetic": True,
+        "riot_id": "%s#%s" % (TARGET_GAME_NAME, TARGET_TAG), "game_name": TARGET_GAME_NAME,
+        "tag_line": TARGET_TAG, "puuid": TARGET_PUUID, "platform": PLATFORM, "region": REGION,
+        "platform_source": "account-v1 region/by-game/lol/by-puuid", "queue": QUEUE, "count_requested": COUNT,
+        "started_at_utc": iso_z(DOWNLOAD_START), "finished_at_utc": finished, "local_timezone": LOCAL_TZ,
+        "ddragon": {"latest_version": LATEST_VERSION, "versions_downloaded": versions,
+                    "map_image": "ddragon/%s/map11.png" % LATEST_VERSION},
+        "match_ids": match_ids_newest, "matches": mstat, "failures": failures, "files": files,
+        "summary": {"matches_processed": len(match_ids_newest), "matches_ok": n_ok,
+                    "timelines_ok": sum(1 for e in mstat.values() if e["timeline"] == "ok"),
+                    "remakes": sum(1 for e in mstat.values() if e.get("remake")), "failures": len(failures),
+                    "requests": n_requests[0], "stale_entries_from_earlier_runs": []},
+        "notes": [SYNTHETIC_NOTE, "seed=%s" % seed,
+                  "All players, names, puuids, matches and timelines are fabricated test data.",
+                  "Data Dragon files are minimal stand-ins (structure only; stats/prices/spells approximate)."],
+    }
+    with open(os.path.join(out_dir, "manifest.json"), "w", encoding="utf-8") as f:
+        json.dump(manifest, f, ensure_ascii=False, indent=1)
+    log.append("%s DONE (synthetic) matches_ok=%d failures=%d" % (finished, n_ok, len(failures)))
+    with open(os.path.join(out_dir, "download_log.txt"), "w", encoding="utf-8") as f:
+        f.write("\n".join(log) + "\n")
+    truth = build_truth(seed, builders, ids, match_ids_newest, versions, patch_versions)
+    truth_path = os.path.join(os.path.dirname(out_dir), "fixture_truth.json")
+    dump_json(truth_path, truth, compact=False)
+    return out_dir, truth_path
+
+
+# --------------------------------------------------------------------------
+# Ground truth aggregates
+# --------------------------------------------------------------------------
+def build_truth(seed, builders, ids, newest, versions, patch_versions):
+    per = {}
+    for c, plan in enumerate(MATCH_PLAN):
+        mid = ids[c][0]
+        if c in builders:
+            per[mid] = builders[c].truth
+        else:
+            per[mid] = {"chrono_index": c, "status": plan.get("status", "complete"),
+                        "note": "match detail download failed; no files written for this match"}
+    chrono = [ids[c][0] for c in range(len(MATCH_PLAN))]
+    with_data = [m for m in chrono if per[m]["status"] in ("complete", "timeline_failed")]
+    with_tl = [m for m in with_data if per[m]["timeline_available"]]
+    jungle = [m for m in with_data if per[m]["team_position"] == "JUNGLE"]
+    pool = {}
+    for m in jungle:
+        e = pool.setdefault(per[m]["champion"], {"games": 0, "wins": 0, "losses": 0, "match_ids": []})
+        e["games"] += 1
+        e["wins" if per[m]["win"] else "losses"] += 1
+        e["match_ids"].append(m)
+    for e in pool.values():
+        e["win_rate"] = round(e["wins"] / float(e["games"]), 4)
+    # tilt: chronological non-remake games with match data
+    seq = [(m, per[m]["win"], per[m]["kda"]["deaths"]) for m in with_data]
+    best, cur, best_ids, cur_ids = 0, 0, [], []
+    for m, w, d in seq:
+        if not w:
+            cur += 1
+            cur_ids.append(m)
+            if cur > best:
+                best, best_ids = cur, list(cur_ids)
+        else:
+            cur, cur_ids = 0, []
+    after2 = [seq[i][0] for i in range(2, len(seq)) if not seq[i - 1][1] and not seq[i - 2][1]]
+    others = [m for m, _, _ in seq if m not in after2]
+    avg = lambda ms: round(sum(per[m]["kda"]["deaths"] for m in ms) / float(len(ms)), 3) if ms else None
+    # hotspot (6-9 min) over matches with timelines
+    window_deaths = []
+    for m in with_tl:
+        for d in per[m]["deaths_pre10"]:
+            if 360000 <= d["ts_ms"] < 540000:
+                window_deaths.append(dict(d, match_id=m, side=per[m]["side"]))
+    zc = {}
+    for d in window_deaths:
+        zc[d["relative_zone"]] = zc.get(d["relative_zone"], 0) + 1
+    by_side = {}
+    for d in window_deaths:
+        if d["relative_zone"] == "enemy_top_jungle":
+            by_side.setdefault(str(d["side"]), []).append(d["position"])
+    centroids = {s: [int(sum(p[0] for p in ps) / len(ps)), int(sum(p[1] for p in ps) / len(ps))]
+                 for s, ps in by_side.items()}
+    ganks = [dict(g, match_id=m) for m in with_tl if per[m]["team_position"] == "JUNGLE"
+             for g in per[m]["ganks_pre10"]]
+    early_deaths = [dict(d, match_id=m) for m in with_tl for d in per[m]["deaths_pre10"]]
+    lane_stats = {}
+    for g in ganks:
+        e = lane_stats.setdefault(g["lane"], {"attempts": 0, "successes": 0})
+        e["attempts"] += 1
+        e["successes"] += 1 if g["success"] else 0
+    undo = [dict(per[m]["item_undo"], match_id=m, first_completed_legendary=per[m]["first_completed_legendary"])
+            for m in with_tl if per[m].get("item_undo")]
+    openings = {m: per[m]["opening"]["pattern"] for m in jungle if per[m].get("opening")}
+    return {
+        "synthetic": True,
+        "WARNING": "SYNTHETIC GROUND TRUTH for automated tests -- not real Riot data, never present as analysis.",
+        "generator": TOOL_NAME, "generator_version": TOOL_VERSION, "seed": seed,
+        "target": {"puuid": TARGET_PUUID, "riot_id": "%s#%s" % (TARGET_GAME_NAME, TARGET_TAG),
+                   "aliases_served_by_mock": ["%s#%s" % a for a in ALIAS_RIOT_IDS],
+                   "platform": PLATFORM, "region": REGION,
+                   "solo_rank": {"tier": "DIAMOND", "rank": "II", "leaguePoints": 47, "wins": 112, "losses": 98}},
+        "duo_partner": {"puuid": DUO_PUUID, "riot_id": "%s#%s" % (DUO_GAME_NAME, DUO_TAG),
+                        "match_ids": [m for m in with_data if per[m]["duo_partner_present"]],
+                        "wins": sum(1 for m in with_data if per[m]["duo_partner_present"] and per[m]["win"])},
+        "ddragon": {"latest_version": LATEST_VERSION, "versions_written": versions,
+                    "match_patch_versions": patch_versions},
+        "match_ids_newest_first": newest,
+        "match_ids_chronological": chrono,
+        "special_matches": {
+            "match_detail_failed": [m for m in chrono if per[m]["status"] == "match_failed"],
+            "timeline_failed": [m for m in chrono if per[m]["status"] == "timeline_failed"],
+            "remake": [m for m in chrono if per[m]["status"] == "remake"],
+            "surrender": [m for m in with_data if per[m]["surrender"]],
+            "challenges_absent": [m for m in with_data if not per[m]["has_challenges"]],
+            "off_role": [m for m in with_data if per[m]["team_position"] not in ("JUNGLE",)],
+            "baron_steal_by_target": [m for m in with_data for o in per[m]["objectives"]
+                                      if o["stolen"] and o["target_involved"]],
+            "executions": {m: per[m]["executions"] for m in with_data if per[m]["executions"]},
+        },
+        "aggregates": {
+            "games_with_match_data": len(with_data),
+            "games_with_timeline": len(with_tl),
+            "jungle_games": len(jungle),
+            "jungle_record": {"wins": sum(1 for m in jungle if per[m]["win"]),
+                              "losses": sum(1 for m in jungle if not per[m]["win"])},
+            "positions": {pos: sum(1 for m in with_data if per[m]["team_position"] == pos)
+                          for pos in sorted({per[m]["team_position"] for m in with_data})},
+            "champion_pool_jungle": pool,
+            "opening_patterns": openings,
+            "early_ganks": {"total": len(ganks), "successes": sum(1 for g in ganks if g["success"]),
+                            "by_lane": lane_stats, "list": ganks},
+            "early_deaths": {"total": len(early_deaths),
+                             "ganked": sum(1 for d in early_deaths if d["kind"] == "ganked"),
+                             "solo": sum(1 for d in early_deaths if d["kind"] == "solo"),
+                             "executed": sum(1 for d in early_deaths if d["kind"] == "executed")},
+        },
+        "tilt": {"definition": "chronological games with match data, remakes excluded",
+                 "sequence": [{"match_id": m, "win": w, "deaths": d} for m, w, d in seq],
+                 "longest_loss_streak": {"length": best, "match_ids": best_ids},
+                 "games_after_2plus_consecutive_losses": after2,
+                 "avg_deaths_after_2plus_losses": avg(after2), "avg_deaths_other_games": avg(others)},
+        "death_hotspot": {"window_ms": [360000, 540000], "expected_relative_zone": "enemy_top_jungle",
+                          "expected_absolute_zone_by_side": {"100": "red_jungle_top", "200": "blue_jungle_top"},
+                          "deaths_in_window_by_relative_zone": zc, "centroid_by_side": centroids,
+                          "deaths": window_deaths},
+        "item_undo": undo,
+        "zones": {"doc": "zone_of(x,y) in make_fixture.py; river band |x+y-14800|<1300, mid band |x-y|<1100, "
+                         "bases x+y<5600 / >MIRROR-5600, lanes x<2000|y>12800 (top) and y<2000|x>12800 (bot)",
+                  "mirror": "(x,y)->(%d-x,%d-y) maps blue-side to red-side" % (MIRROR_W, MIRROR_H)},
+        "matches": per,
+    }
+
+
+# --------------------------------------------------------------------------
+# Self-check
+# --------------------------------------------------------------------------
+STACKABLE = (2003, 2055)
+VALID_POS = ("TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY")
+
+
+def check_dataset(d):
+    errs = []
+    stats = {"matches": 0, "timelines": 0, "events": 0, "frames": 0}
+
+    def err(msg):
+        if len(errs) < 200:
+            errs.append(msg)
+    load = lambda rel: json.load(open(os.path.join(d, rel), encoding="utf-8"))
+    man = load("manifest.json")
+    if man.get("synthetic") is not True:
+        err("manifest.synthetic must be true")
+    for rel, meta in man["files"].items():
+        p = os.path.join(d, rel)
+        if not os.path.isfile(p):
+            err("missing file " + rel)
+            continue
+        if os.path.getsize(p) != meta["bytes"] or sha256_file(p) != meta["sha256"]:
+            err("hash/size mismatch " + rel)
+    ids = load("match_ids.json")
+    if ids != man["match_ids"] or len(ids) != COUNT:
+        err("match_ids.json mismatch with manifest or count != %d" % COUNT)
+    meta = load("ddragon/meta.json")
+    for v in man["ddragon"]["versions_downloaded"]:
+        need = ["champion_zh_CN.json", "champion_en_US.json", "item_zh_CN.json", "item_en_US.json"]
+        if v == meta["latest_version"]:
+            need += ["map11.png", "championFull_zh_CN.json", "championFull_en_US.json"]
+        for f in need:
+            if not os.path.isfile(os.path.join(d, "ddragon", v, f)):
+                err("missing ddragon file %s/%s" % (v, f))
+    full = json.load(open(os.path.join(d, "ddragon", meta["latest_version"], "championFull_zh_CN.json"),
+                          encoding="utf-8"))
+    if any(len(c.get("spells", [])) != 4 for c in full["data"].values()):
+        err("championFull: every champion needs 4 spells")
+    with open(os.path.join(d, "ddragon", meta["latest_version"], "map11.png"), "rb") as f:
+        png = f.read()
+    if png[:8] != b"\x89PNG\r\n\x1a\n" or struct.unpack(">II", png[16:24]) != (512, 512):
+        err("map11.png is not a 512x512 PNG")
+    champ_json = json.load(open(os.path.join(d, "ddragon", meta["latest_version"], "champion_en_US.json"), encoding="utf-8"))
+    item_json = json.load(open(os.path.join(d, "ddragon", meta["latest_version"], "item_en_US.json"), encoding="utf-8"))
+    no_chal = 0
+    ranks = load("lane_opponent_ranks.json")
+    xmin, ymin, xmax, ymax = BOUNDS
+
+    def inb(p):
+        return xmin <= p["x"] <= xmax and ymin <= p["y"] <= ymax and isinstance(p["x"], int) and isinstance(p["y"], int)
+    for mid in ids:
+        st = man["matches"][mid]
+        mp, tp = os.path.join(d, "matches", mid + ".json"), os.path.join(d, "timelines", mid + ".json")
+        if st["match"] != "ok":
+            if os.path.exists(mp) or os.path.exists(tp):
+                err("%s: failed match must have no files" % mid)
+            continue
+        m = load("matches/%s.json" % mid)
+        stats["matches"] += 1
+        info = m["info"]
+        ps = info["participants"]
+        if m["metadata"]["matchId"] != mid or m["metadata"]["participants"] != [p["puuid"] for p in ps]:
+            err("%s: metadata mismatch" % mid)
+        if [p["participantId"] for p in ps] != list(range(1, 11)):
+            err("%s: participantIds" % mid)
+        if any(p["teamId"] != (100 if p["participantId"] <= 5 else 200) for p in ps):
+            err("%s: teamIds" % mid)
+        if info["queueId"] != QUEUE or info["mapId"] != 11 or info["platformId"] != "EUW1":
+            err("%s: queue/map/platform" % mid)
+        remake = ps[0]["gameEndedInEarlySurrender"]
+        for p in ps:
+            if remake and p["teamPosition"] != "":
+                err("%s: remake teamPosition must be empty" % mid)
+            if not remake and p["teamPosition"] not in VALID_POS:
+                err("%s: bad teamPosition %r" % (mid, p["teamPosition"]))
+            if p["teamPosition"] == "JUNGLE" and SPELL_SMITE not in (p["summoner1Id"], p["summoner2Id"]):
+                err("%s: jungler without smite" % mid)
+            if p["championName"] not in champ_json["data"]:
+                err("%s: champion %s missing from ddragon" % (mid, p["championName"]))
+            for i in range(7):
+                if p["item%d" % i] and str(p["item%d" % i]) not in item_json["data"]:
+                    err("%s: item %s missing from ddragon" % (mid, p["item%d" % i]))
+        if any("challenges" not in p for p in ps):
+            no_chal += 1
+            if any("challenges" in p for p in ps):
+                err("%s: challenges must be absent for all participants or none" % mid)
+        enemy_jg = [p for p in ps if p["participantId"] in ((7,) if any(
+            q["puuid"] == TARGET_PUUID and q["teamId"] == 100 for q in ps) else (2,))]
+        if enemy_jg and enemy_jg[0]["puuid"] not in ranks:
+            err("%s: enemy jungler missing from lane_opponent_ranks.json" % mid)
+        for team in info["teams"]:
+            tk = sum(p["kills"] for p in ps if p["teamId"] == team["teamId"])
+            if team["objectives"]["champion"]["kills"] != tk:
+                err("%s: team champion kills mismatch" % mid)
+        if st["timeline"] != "ok":
+            if os.path.exists(tp):
+                err("%s: failed timeline must have no file" % mid)
+            continue
+        tl = load("timelines/%s.json" % mid)
+        stats["timelines"] += 1
+        ti = tl["info"]
+        frames = ti["frames"]
+        stats["frames"] += len(frames)
+        if ti["frameInterval"] != 60000 or tl["metadata"]["participants"] != m["metadata"]["participants"]:
+            err("%s: timeline metadata" % mid)
+        if [x["puuid"] for x in ti["participants"]] != [p["puuid"] for p in ps]:
+            err("%s: timeline participants" % mid)
+        ge = [e for fr in frames for e in fr["events"] if e["type"] == "GAME_END"]
+        if len(ge) != 1:
+            err("%s: need exactly one GAME_END" % mid)
+            continue
+        end = ge[0]["timestamp"]
+        if len(frames) != end // 60000 + 2:
+            err("%s: frame count %d != %d" % (mid, len(frames), end // 60000 + 2))
+        if frames[0]["timestamp"] != 0 or frames[-1]["timestamp"] != end:
+            err("%s: first/last frame timestamps" % mid)
+        if abs(info["gameDuration"] - end // 1000) > 1:
+            err("%s: gameDuration vs GAME_END" % mid)
+        if ge[0]["winningTeam"] != [t["teamId"] for t in info["teams"] if t["win"]][0]:
+            err("%s: winningTeam" % mid)
+        n = len(frames)
+        prev = {}
+        for k, fr in enumerate(frames):
+            if k and abs(fr["timestamp"] - min(k * 60000, end)) > 100:
+                err("%s: frame %d timestamp off" % (mid, k))
+            pf = fr["participantFrames"]
+            if sorted(pf, key=int) != [str(i) for i in range(1, 11)]:
+                err("%s: frame %d participantFrames keys" % (mid, k))
+            for key, v in pf.items():
+                if v["participantId"] != int(key) or not inb(v["position"]):
+                    err("%s: frame %d pid/pos %s" % (mid, k, key))
+                if v["currentGold"] < 0:
+                    err("%s: negative currentGold frame %d pid %s" % (mid, k, key))
+                if key in prev:
+                    for f in ("totalGold", "xp", "minionsKilled", "jungleMinionsKilled", "level"):
+                        if v[f] < prev[key][f]:
+                            err("%s: %s decreased at frame %d pid %s" % (mid, f, k, key))
+                prev[key] = v
+            last_t = -1
+            for e in fr["events"]:
+                t = e["timestamp"]
+                stats["events"] += 1
+                lo, hi = (0, 0) if k == 0 else ((k - 1) * 60000, end if k == n - 1 else k * 60000)
+                ok = (t == 0) if k == 0 else (lo < t <= hi)
+                if not ok:
+                    err("%s: event %s t=%d in frame %d" % (mid, e["type"], t, k))
+                if t < last_t:
+                    err("%s: events not sorted in frame %d" % (mid, k))
+                last_t = t
+                if "position" in e and not inb(e["position"]):
+                    err("%s: event position out of bounds" % mid)
+                if e["type"] == "WARD_PLACED" and "position" in e:
+                    err("%s: WARD_PLACED must not have position" % mid)
+                if e["type"] == "CHAMPION_KILL" and "assistingParticipantIds" in e and not e["assistingParticipantIds"]:
+                    err("%s: empty assistingParticipantIds must be omitted" % mid)
+        evs = [e for fr in frames for e in fr["events"]]
+        last = frames[-1]["participantFrames"]
+        kc = {i: [0, 0, 0] for i in range(1, 11)}
+        for e in evs:
+            if e["type"] == "CHAMPION_KILL":
+                if e["killerId"]:
+                    kc[e["killerId"]][0] += 1
+                kc[e["victimId"]][1] += 1
+                for a in e.get("assistingParticipantIds", []):
+                    kc[a][2] += 1
+        for p in ps:
+            i = p["participantId"]
+            lf = last[str(i)]
+            if kc[i] != [p["kills"], p["deaths"], p["assists"]]:
+                err("%s: pid %d KDA %s vs events %s" % (mid, i, [p["kills"], p["deaths"], p["assists"]], kc[i]))
+            if (lf["minionsKilled"], lf["jungleMinionsKilled"], lf["level"], lf["totalGold"], lf["xp"]) != (
+                    p["totalMinionsKilled"], p["neutralMinionsKilled"], p["champLevel"], p["goldEarned"],
+                    p["champExperience"]):
+                err("%s: pid %d final frame vs match totals" % (mid, i))
+            if lf["damageStats"]["totalDamageDoneToChampions"] != p["totalDamageDealtToChampions"]:
+                err("%s: pid %d damage to champions mismatch" % (mid, i))
+            nlu = sum(1 for e in evs if e["type"] == "LEVEL_UP" and e["participantId"] == i)
+            nsk = sum(1 for e in evs if e["type"] == "SKILL_LEVEL_UP" and e["participantId"] == i
+                      and e["levelUpType"] == "NORMAL")
+            if nlu != p["champLevel"] - 1 or (nsk != p["champLevel"] and p["champLevel"] > 1):
+                err("%s: pid %d level-up events %d/%d vs champLevel %d" % (mid, i, nlu, nsk, p["champLevel"]))
+            wp = sum(1 for e in evs if e["type"] == "WARD_PLACED" and e["creatorId"] == i)
+            wk = sum(1 for e in evs if e["type"] == "WARD_KILL" and e["killerId"] == i)
+            if (wp, wk) != (p["wardsPlaced"], p["wardsKilled"]):
+                err("%s: pid %d ward counts" % (mid, i))
+        # objectives vs events
+        for team in info["teams"]:
+            tid = team["teamId"]
+            o = team["objectives"]
+            cnt = lambda mt: sum(1 for e in evs if e["type"] == "ELITE_MONSTER_KILL" and e["monsterType"] == mt
+                                 and e["killerTeamId"] == tid)
+            for key, mt in (("dragon", "DRAGON"), ("baron", "BARON_NASHOR"), ("horde", "HORDE"),
+                            ("riftHerald", "RIFTHERALD"), ("atakhan", "ATAKHAN")):
+                if o[key]["kills"] != cnt(mt):
+                    err("%s: team %d %s kills mismatch" % (mid, tid, key))
+            tw = sum(1 for e in evs if e["type"] == "BUILDING_KILL" and e["buildingType"] == "TOWER_BUILDING"
+                     and e["teamId"] != tid)
+            if o["tower"]["kills"] != tw:
+                err("%s: team %d tower kills mismatch" % (mid, tid))
+        # item replay
+        inv = {i: {} for i in range(1, 11)}
+        trink = {i: 0 for i in range(1, 11)}
+        last_buy = {}
+        destroyed_at = {i: [] for i in range(1, 11)}
+        for e in evs:
+            if not e["type"].startswith("ITEM_"):
+                continue
+            i = e["participantId"]
+            iv = inv[i]
+            if e["type"] == "ITEM_PURCHASED":
+                it = e["itemId"]
+                if ITEMS.get(it, ("",) * 6)[5] == "trinket":
+                    trink[i] = it
+                else:
+                    iv[it] = iv.get(it, 0) + 1
+                last_buy[i] = (it, [x for (t, x) in destroyed_at[i] if t == e["timestamp"]])
+                destroyed_at[i] = []
+            elif e["type"] in ("ITEM_DESTROYED", "ITEM_SOLD"):
+                it = e["itemId"]
+                if ITEMS.get(it, ("",) * 6)[5] == "trinket":
+                    trink[i] = 0
+                elif iv.get(it, 0) <= 0:
+                    err("%s: pid %d %s of item %d not in inventory" % (mid, i, e["type"], it))
+                else:
+                    iv[it] -= 1
+                if e["type"] == "ITEM_DESTROYED":
+                    destroyed_at[i].append((e["timestamp"], it))
+            elif e["type"] == "ITEM_UNDO":
+                b = e["beforeId"]
+                if iv.get(b, 0) <= 0:
+                    err("%s: undo of item not owned" % mid)
+                    continue
+                iv[b] -= 1
+                if last_buy.get(i, (None,))[0] == b:
+                    for x in last_buy[i][1]:
+                        iv[x] = iv.get(x, 0) + 1
+        for p in ps:
+            i = p["participantId"]
+            want = sorted(x for x in (p["item%d" % k] for k in range(6)) if x)
+            have = sorted(it for it, c in inv[i].items() for _ in range(1 if it in STACKABLE and c > 0 else max(c, 0)))
+            if want != have or p["item6"] != trink[i]:
+                err("%s: pid %d final items %s vs replay %s (trinket %s/%s)" % (mid, i, want, have, p["item6"], trink[i]))
+            if len(want) > 6:
+                err("%s: pid %d more than 6 items" % (mid, i))
+    if no_chal != 1:
+        err("expected exactly one match without challenges, got %d" % no_chal)
+    tpath = os.path.join(os.path.dirname(os.path.abspath(d)), "fixture_truth.json")
+    if os.path.isfile(tpath):
+        truth = json.load(open(tpath, encoding="utf-8"))
+        for mid, t in truth["matches"].items():
+            if t.get("status") in ("complete", "timeline_failed", "remake"):
+                m = load("matches/%s.json" % mid)
+                p = m["info"]["participants"][t["participant_id"] - 1]
+                if p["puuid"] != TARGET_PUUID or [p["kills"], p["deaths"], p["assists"]] != [
+                        t["kda"]["kills"], t["kda"]["deaths"], t["kda"]["assists"]]:
+                    err("%s: truth/target mismatch" % mid)
+        if truth["aggregates"]["jungle_games"] < 16:
+            err("need >= 16 jungle games with data")
+    return errs, stats
+
+
+def make_zip(out_dir, zip_path):
+    base = os.path.basename(os.path.abspath(out_dir).rstrip(os.sep))
+    os.makedirs(os.path.dirname(os.path.abspath(zip_path)), exist_ok=True)
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+        for root, dirs, fs in os.walk(out_dir):
+            dirs.sort()
+            for fn in sorted(fs):
+                full = os.path.join(root, fn)
+                z.write(full, os.path.join(base, os.path.relpath(full, out_dir)))
+    return zip_path
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description="Generate a SYNTHETIC (test-only) LoL opponent-analysis dataset.")
+    ap.add_argument("--out", help="dataset directory to (re)create; truth goes to DIR/../fixture_truth.json")
+    ap.add_argument("--seed", type=int, default=20261024, help="RNG seed (target puuid is seed-independent)")
+    ap.add_argument("--zip", help="also write a zip of the dataset directory (top-level folder = DIR name)")
+    ap.add_argument("--check", nargs="?", const=True, default=None, metavar="DIR",
+                    help="validate internal consistency (of --out after generating, or of DIR)")
+    args = ap.parse_args(argv)
+    if not args.out and not args.check:
+        ap.error("need --out DIR and/or --check [DIR]")
+    if args.out:
+        out, truth = generate(args.out, args.seed)
+        print("wrote synthetic dataset: %s" % out)
+        print("wrote ground truth:      %s" % truth)
+        if args.zip:
+            print("wrote zip:               %s" % make_zip(out, args.zip))
+    check_dir = args.check if isinstance(args.check, str) else (args.out if args.check else None)
+    if check_dir:
+        errs, stats = check_dataset(check_dir)
+        print("check: %d matches, %d timelines, %d frames, %d events" % (
+            stats["matches"], stats["timelines"], stats["frames"], stats["events"]))
+        if errs:
+            for e in errs:
+                print("CHECK FAIL: " + e)
+            return 1
+        print("check: OK")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

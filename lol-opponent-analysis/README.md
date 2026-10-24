@@ -5,6 +5,8 @@
 - `download_riot.py`：第一步，下载数据（在你自己的电脑上跑）
 - `analyze.py` + `lolanalysis/`：第二步，原始数据 → CSV → 汇总 → 仪表板
 - `strategy.example.json`：应对方案页的填写格式
+- `data/patch_notes_26.20-26.21.json`：最近两个版本（26.20、26.21）官方更新公告 / 英雄联盟 Wiki 的摘录，
+  每条带版本号和来源链接；`analyze.py` 默认读取，在“应对方案”页列出与他的英雄、我的英雄池和野区资源相关的改动
 - `tests/`：只用于测试代码的合成数据和模拟服务器（不是真实对局）
 
 两个脚本都只用 Python 自带的库，不需要 `pip install`。
@@ -124,9 +126,24 @@ python3 -I analyze.py report --out out --strategy strategy.json   # 生成 out/d
 - **坐标**：左下是蓝方基地、右上是红方。区域是近似划分，`calibrate` 会把位置点画到小地图上，
   并统计对线期上单/中单/下路的位置有多少落在自己那条线上，用来核对划分是否合理。
 
+### 数据来源的约定
+
+- 技能冷却、消耗：只从 zip 里的 Data Dragon 当前版本 `championFull.json` 读；装备价格和属性：只从 `item.json` 读。
+- 野怪、小龙、巢虫、先锋、男爵的刷新时间：Data Dragon 里没有，来自官方更新公告和英雄联盟 Wiki（见 `data/`，带链接）。
+- 对位胜率：只用你提供的 OP.GG 截图（分析环境访问不了 OP.GG），写明版本、段位范围和样本量；没有截图就不写胜率。
+
 ## 测试
 
 ```
-python3 -I tests/make_fixture.py --out /tmp/fx/data --zip /tmp/fx/fixture.zip   # 合成数据（不是真实对局）
-python3 -I analyze.py all /tmp/fx/fixture.zip --out /tmp/fx/out
+python3 -I tests/run_tests.py --work /tmp/lol_test
+```
+
+`run_tests.py` 会：生成合成数据（不是真实对局）→ 启动模拟的 Riot API / Data Dragon（注入 429、没有 Retry-After 的 429、
+503、404、过期密钥）→ 用 `download_riot.py` 下载 → `analyze.py all` 分析 → 和合成数据的真值逐项对照
+（开野方向、成功的抓人、前 10 分钟死亡、首件成装（含撤销购买）、双排、死亡热点）。
+
+单独生成合成数据：
+
+```
+python3 -I tests/make_fixture.py --out /tmp/fx/data --zip /tmp/fx/fixture.zip
 ```

@@ -75,7 +75,7 @@ def main():
         env = dict(os.environ, RIOT_API_KEY=FAKE_KEY)
         dl_out = os.path.join(work, "dl", "lol_data_test")
         t0 = time.time()
-        r = run([sys.executable, "-I", os.path.join(ROOT, "download_riot.py"), "--riot-id", "原州市的努力的天才超级打野李承勇#VALOR",
+        r = run([sys.executable, "-I", os.path.join(ROOT, "download_riot.py"), "--riot-id", "TestJungler#TEST",
                  "--out", dl_out, "--api-base", "http://127.0.0.1:%d" % port, "--ddragon-base", "http://127.0.0.1:%d" % port],
                 env=env, check=False)
         print("下载脚本退出码 %d，用时 %.0f 秒" % (r.returncode, time.time() - t0))
@@ -101,6 +101,11 @@ def main():
             assert meta.get("downloaded_at_utc") and meta.get("sha256"), rel
         print("下载测试通过：%d 个文件，失败 %d 项（含注入的 503/404）" % (len(names), len(man["failures"])))
 
+        r0 = run([sys.executable, "-I", os.path.join(ROOT, "download_riot.py"), "--riot-id", "原州市的努力的天才超级打野李承勇#VALOR",
+                  "--count", "1", "--no-zip", "--no-opponent-ranks", "--out", os.path.join(work, "dl", "cn_name"),
+                  "--api-base", "http://127.0.0.1:%d" % port, "--ddragon-base", "http://127.0.0.1:%d" % port], env=env, check=False)
+        assert r0.returncode == 0 and "找到账号" in r0.stdout, r0.stdout[-1500:]
+        print("中文游戏名（百分号编码）测试通过")
         # 断点续传：再跑一次同一目录，不应重复下载已有文件
         r2 = run([sys.executable, "-I", os.path.join(ROOT, "download_riot.py"), "--riot-id", "TestJungler#TEST", "--out", dl_out,
                   "--no-zip", "--api-base", "http://127.0.0.1:%d" % port, "--ddragon-base", "http://127.0.0.1:%d" % port],
@@ -137,11 +142,89 @@ def main():
 
 
 def check_truth(S, truth, out, excluded_ids):
-    """和合成数据的真值对照（字段名以 make_fixture.py 写出的 fixture_truth.json 为准）。"""
-    problems = []
-    print("真值文件字段：%s" % sorted(truth.keys()))
+    """和合成数据的真值逐项对照。只对比实际纳入分析的对局（测试里额外注入了 503/404）。"""
+    import csv
+    problems, notes = [], []
+
+    def rows(name):
+        with open(os.path.join(out, "csv", name), encoding="utf-8-sig", newline="") as fh:
+            return list(csv.DictReader(fh))
+
+    games = {g["match_id"]: g for g in rows("games.csv") if g["included"] == "1"}
+    T = truth["matches"]
+    # 1. 胜负、英雄、位置、红蓝方
+    for mid, g in games.items():
+        t = T.get(mid)
+        if not t:
+            problems.append("%s 不在真值里" % mid)
+            continue
+        if int(g["win"]) != int(bool(t["win"])) or g["champ"] != t["champion"] or g["position"] != t["team_position"]:
+            problems.append("%s 基本信息不一致：%s/%s/%s vs %s/%s/%s" % (mid, g["win"], g["champ"], g["position"],
+                                                                 t["win"], t["champion"], t["team_position"]))
+    # 2. 英雄池（打野）
+    for c in S["champ_pool"]["rows"]:
+        ids = [m for m in c["match_ids"] if T.get(m, {}).get("team_position") == "JUNGLE"]
+        tw = sum(1 for m in ids if T[m]["win"])
+        if c["wins"] != sum(1 for m in c["match_ids"] if T[m]["win"]):
+            problems.append("英雄池 %s 胜场不一致" % c["champ"])
+    # 3. 双排
+    duo = truth["duo_partner"]
+    exp = [m for m in duo["match_ids"] if m in games]
+    got = [d for d in S["duo"]["rows"] if d["puuid"] == duo["puuid"]]
+    if len(exp) >= 3 and (not got or got[0]["games"] != len(exp)):
+        problems.append("双排场次不一致：期望 %d，得到 %s" % (len(exp), got and got[0]["games"]))
+    # 4. 前 10 分钟死亡（总数 / 被抓）
+    tl_ids = [m for m, g in games.items() if g["has_timeline"] == "1"]
+    exp_d = sum(len(T[m]["deaths_pre10"]) for m in tl_ids)
+    exp_g = sum(1 for m in tl_ids for d in T[m]["deaths_pre10"] if d["enemies_involved"] >= 2)
+    es = S["lane"]["early_summary"]
+    if es["deaths"] != exp_d or es["ganked_deaths"] != exp_g:
+        problems.append("前 10 分钟死亡不一致：%d/%d vs 真值 %d/%d" % (es["deaths"], es["ganked_deaths"], exp_d, exp_g))
+    # 5. 首件成装时间（含撤销的那场）
+    for mid in tl_ids:
+        fl = T[mid].get("first_completed_legendary")
+        got = games[mid]["first_item_time_s"]
+        if fl and (not got or abs(float(got) - fl["ts_ms"] / 1000.0) > 1):
+            problems.append("%s 首件成装时间：%s vs 真值 %.0f" % (mid, got, fl["ts_ms"] / 1000.0))
+    undo = [u for u in truth.get("item_undo", []) if u.get("match_id") in tl_ids] if isinstance(truth.get("item_undo"), list) else []
+    notes.append("撤销购买的对局：%d 场纳入对照" % len(undo))
+    # 6. 开野方向（上半/下半/入侵）
+    J = S.get("jungle") or {}
+    agree = total = 0
+    for o in J.get("openings", []):
+        t = T[o["match_id"]]["opening"]
+        want = "入侵" if t.get("invade") else ("下半" if t["start_half"] == "bottom" else "上半")
+        total += 1
+        if want in o["start_label"]:
+            agree += 1
+        else:
+            notes.append("开野不一致 %s：真值 %s（%s），推测 %s；依据 %s" % (o["match_id"], t["pattern"], want, o["start_label"], o["basis"]))
+    notes.append("开野方向一致 %d/%d" % (agree, total))
+    if total and agree / total < 0.8:
+        problems.append("开野方向一致率太低：%d/%d" % (agree, total))
+    # 7. 抓到人的抓人（真值 success=True）能不能在同一路 ±60 秒找到
+    hit = miss = 0
+    for gk in J.get("ganks", []):
+        eps = gk["episodes"]
+        for t in T[gk["match_id"]]["ganks_pre10"]:
+            if not t["success"]:
+                continue
+            lane = {"MIDDLE": "MID", "BOTTOM": "BOT"}.get(t["lane"], t["lane"])
+            ok = any(e["lane"] == lane and e["result"].startswith("抓到") and abs(e["t_min"] - t["minute"]) <= 1.0 for e in eps)
+            hit += ok
+            miss += not ok
+    notes.append("成功的抓人找回 %d/%d" % (hit, hit + miss))
+    if hit + miss and hit / (hit + miss) < 0.8:
+        problems.append("成功抓人找回率太低：%d/%d" % (hit, hit + miss))
+    # 8. 死亡热点
+    top = (S["deaths"].get("early_top_zone") or [None])[0]
+    if top != "对方上半野区":
+        problems.append("前 10 分钟死亡热点应为 对方上半野区，得到 %s" % top)
+    for n in notes:
+        print("  " + n)
     if problems:
         raise SystemExit("真值对照失败：\n" + "\n".join(problems))
+    print("真值对照通过")
 
 
 if __name__ == "__main__":

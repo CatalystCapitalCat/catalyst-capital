@@ -137,7 +137,7 @@ def compute(out_dir, ds_meta, log=print):
     S["weakness"] = _weakness(games, tl_games, kills, frames, parts, src)
     S["ban"] = _ban(S["champ_pool"], src)
     S["lobby_ranks"] = _lobby_ranks(ds_meta, main_games, src)
-    S["ref"] = _ref(C, S["champ_pool"], ds_meta.get("my_pool") or [])
+    S["ref"] = _ref(C, S["champ_pool"], ds_meta.get("my_pool") or [], main_games)
     S["checks"] = {"challenges_mismatch": plog.get("challenges_mismatch", []),
                    "geometry_selftest_failures": [list(map(str, b)) for b in G.self_test()]}
     with open(os.path.join(out_dir, "summary.json"), "w", encoding="utf-8") as fh:
@@ -469,7 +469,8 @@ def _jungle(jg, frames, kills, objs, src):
                  "wins": sum(o["win"] for o in openings if o["pattern"] == p),
                  "match_ids": [o["match_id"] for o in openings if o["pattern"] == p]} for p, c in pat.most_common()]
     starts = [{"start": s, "games": c, "share": c / n,
-               "by_side": dict(Counter(o["side"] for o in openings if o["start_label"] == s)),
+               "by_side": dict(Counter("%s·%s" % (o["side"], o["start_buff"] or "?") for o in openings
+                                       if o["start_label"] == s)),
                "median_first_gank_min": median(_first_gank_min(ganks_all, [o["match_id"] for o in openings
                                                                          if o["start_label"] == s])),
                "first_gank_lanes": dict(Counter(_first_gank_lane(ganks_all, o["match_id"]) for o in openings
@@ -521,7 +522,7 @@ def _jungle(jg, frames, kills, objs, src):
         "lanes_pre10": lanes, "ganks": ganks_all, "invade": _invade_summary(invade_rows),
         "objectives": objectives, "half_preference": half,
         "cs_per_camp_assumption": CS_PER_CAMP,
-        "basis": ("开野：第 1 分钟（1:00）位置所在半区 = 开局方向（1:00 在基地/河道时改用 2:00）；"
+        "basis": ("开野：第 1 分钟（1:00，野怪 0:55 刷新）位置所在半区 = 开局方向（1:00 在基地/河道时改用 2:00）；"
                   "最近营地距离 < %.0f 码时标注营地名；第 3 分钟位置 = 去向；补刀按每组约 %.0f 个估算组数。"
                   "抓人：时间线击杀事件（他是击杀/助攻/阵亡者）在线上或河道口 = 直接数据；"
                   "第 2–14 分钟整分钟位置在线上或河道口 = 推测（每分钟只记一次位置）。"
@@ -554,14 +555,16 @@ def _opening(g, fr):
             start_half = q["zone"]
             start_min = m
             break
+    start_buff = ""
     if start_half:
         _, side, half = start_half.split("_")
         own = (side == "BLUE") == (team == 100)
-        buff = G.jungle_half_buff(team if own else (300 - team), half)
+        start_buff = G.jungle_half_buff(team if own else (300 - team), half)
+        # 对上单来说关键是半区（上半区靠近上路）；起手 buff 随阵营不同，单独记录
         if own:
-            start_label = "%s开（%s侧）" % ("上半区" if half == "TOP" else "下半区", buff)
+            start_label = "%s开" % ("上半区" if half == "TOP" else "下半区")
         else:
-            start_label = "一级入侵对方%s（%s侧）" % ("上半区" if half == "TOP" else "下半区", buff)
+            start_label = "一级入侵对方%s" % ("上半区" if half == "TOP" else "下半区")
         basis.append("%d:00 在%s%s" % (start_min, p[start_min]["zone_rel"],
                                        "（%s 附近）" % p[start_min]["camp"] if p[start_min]["camp"] else ""))
     else:
@@ -584,7 +587,7 @@ def _opening(g, fr):
         elif z.startswith("BASE_"):
             where3 = "回城"
         elif z in ("RIVER_TOP", "RIVER_BOT", "BARON_PIT", "DRAGON_PIT"):
-            where3 = "在%s" % G.ZONE_NAMES[z]
+            where3 = "在%s（河蟹 2:55 刷新）" % G.ZONE_NAMES[z] if z.startswith("RIVER") else "在%s" % G.ZONE_NAMES[z]
         else:
             where3 = "其它"
         basis.append("3:00 在%s%s" % (q3["zone_rel"], "（%s 附近）" % q3["camp"] if q3["camp"] else ""))
@@ -594,7 +597,7 @@ def _opening(g, fr):
     camps3 = round(cs[3] / CS_PER_CAMP, 1) if cs.get(3) is not None else None
     basis.append("打野补刀 2:00/3:00/4:00 = %s/%s/%s" % (cs[2], cs[3], cs[4]))
     return {"match_id": g["match_id"], "champ_zh": g["champ_zh"], "side": g["side"], "win": g["win"],
-            "start_label": start_label, "where_3": where3, "pattern": "%s → 3:00 %s" % (start_label, where3),
+            "start_label": start_label, "start_buff": start_buff, "where_3": where3, "pattern": "%s → 3:00 %s" % (start_label, where3),
             "points": [p[m] for m in (1, 2, 3, 4) if p.get(m)], "cs": cs, "camps_by_3_est": camps3,
             "basis": "；".join(basis), "inferred": True}
 
@@ -897,7 +900,7 @@ def _ban(pool, src):
             "src": pool["src"]}
 
 
-def _ref(C, pool, my_pool, top_n=4):
+def _ref(C, pool, my_pool, main_games, top_n=4):
     """Data Dragon 当前版本的技能数据：他最常用的几个英雄 + 我的英雄池。"""
     path = os.path.join(C, "champion_spells.csv")
     if not os.path.exists(path):
@@ -918,6 +921,16 @@ def _ref(C, pool, my_pool, top_n=4):
             else:
                 out[key].append({"champ": c, "name_zh": c, "spells": [], "missing": True})
     out["src"] = "Data Dragon %s championFull.json（zh_CN）" % (out["version"] or "?")
+    ipath = os.path.join(C, "items_ref.csv")
+    if os.path.exists(ipath):
+        ref_items = {int(r["item_id"]): r for r in read_csv(ipath)}
+        cnt = Counter(int(g["first_item_id"]) for g in main_games if g.get("first_item_id"))
+        out["first_items"] = [{"item_id": iid, "times": n, "name_zh": ref_items[iid]["name_zh"],
+                               "gold_total": ref_items[iid]["gold_total"], "stats_text": ref_items[iid].get("stats_text", ""),
+                               "version": ref_items[iid]["version"]}
+                              for iid, n in cnt.most_common(6) if iid in ref_items]
+        out["items_src"] = "Data Dragon %s item.json（zh_CN）；次数来自时间线 ITEM_PURCHASED" % (
+            out["first_items"][0]["version"] if out["first_items"] else "?")
     return out
 
 
@@ -948,8 +961,10 @@ def _f(x, d=1):
 def print_summary(S, log=print):
     m = S["meta"]
     log("=" * 60)
-    log("%s | 纳入 %d/%d 场（有时间线 %d）| 版本 %s | 下载 %s" % (
-        m.get("riot_id"), m["n_included"], m["n_ids"], m["n_timeline"], "/".join(m["patches"]), m.get("downloaded_date")))
+    log("%s | 纳入 %d/%d 场（有时间线 %d）| 版本 %s | 下载 %s%s" % (
+        m.get("riot_id"), m["n_included"], m["n_ids"], m["n_timeline"], "/".join(m["patches"]), m.get("downloaded_date"),
+        "（样本太少）" if m["n_included"] < SMALL_N else ""))
+    log("（打野相关的开野/抓人/半区偏好都是由每分钟一个位置点推测的；分段/英雄样本 < 10 的结论都只能参考）")
     r = S.get("rank")
     if r:
         log("段位：%s %s %s LP，本赛季 %s 胜 %s 负" % (r.get("tier"), r.get("rank"), r.get("leaguePoints"), r.get("wins"), r.get("losses")))

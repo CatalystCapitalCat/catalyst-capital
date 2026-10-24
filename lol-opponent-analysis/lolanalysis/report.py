@@ -96,10 +96,17 @@ class MiniMap:
             with open(png_path, "rb") as fh:
                 self.href = "data:image/png;base64," + base64.b64encode(fh.read()).decode("ascii")
 
+    def defs(self):
+        """整页只内嵌一次小地图图片，各张地图用 <use> 引用。"""
+        if not self.href:
+            return ""
+        return ('<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>'
+                '<image id="map11" href="%s" x="0" y="0" width="512" height="512" preserveAspectRatio="none"/>'
+                '</defs></svg>' % self.href)
+
     def svg(self, layers, title, legend, zones=False):
         """layers: 已生成的 SVG 片段列表（坐标为 512×512 像素）。"""
-        bg = ('<image href="%s" x="0" y="0" width="512" height="512" preserveAspectRatio="none"/>' % self.href
-              if self.href else self._schematic())
+        bg = '<use href="#map11"/>' if self.href else self._schematic()
         z = self._zones() if zones else ""
         leg = "".join('<span class="lg"><svg width="14" height="14" aria-hidden="true">%s</svg>%s</span>' % (sym, E(lbl))
                       for sym, lbl in legend)
@@ -178,7 +185,7 @@ def render(summary, strategy, map_png, out_dir, calib=None, notes=None):
         ("jungle" if S.get("jungle") else "lane", "打野" if S.get("jungle") else "对线", _lane_jungle(S, mm)),
         ("deaths", "死亡分布", _deaths(S, mm)),
         ("plan", "应对方案", _plan(S, st) + _ref_section(S, notes)),
-        ("sources", "数据来源", _sources(S, st, mm, calib)),
+        ("sources", "数据来源", _sources(S, st, mm, calib, notes)),
     ]
     m = S["meta"]
     r = S.get("rank") or {}
@@ -206,7 +213,7 @@ def render(summary, strategy, map_png, out_dir, calib=None, notes=None):
         '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&'
         'family=JetBrains+Mono:wght@400&family=Noto+Sans+SC:wght@400;500;700&display=swap">\n'
         '<style>%s</style>\n' % (E(m.get("game_name") or "对手"), CSS))
-    body_part = '%s%s<main>%s</main>\n<script>%s</script>\n' % (head, nav, panels, JS)
+    body_part = '%s%s%s<main>%s</main>\n<script>%s</script>\n' % (mm.defs(), head, nav, panels, JS)
     fragment = head_part + body_part
     full = ('<!doctype html>\n<html lang="zh-CN"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
@@ -380,7 +387,7 @@ ROUTE_CLS = ["s1", "s2", "s3"]
 def _jungle_section(J, mm):
     out = ['<h2>打野：开野方向%s%s</h2>' % (inferred_badge(), small_badge(J["small"]))]
     out.append('<p class="note">依据：%s</p>' % E(J["basis"]))
-    out.append(table(["开局方向", "场次", "占比", "蓝方/红方", "第一次去线上（中位）", "第一次去的线"],
+    out.append(table(["开局方向", "场次", "占比", "阵营·起手 buff", "第一次去线上（中位）", "第一次去的线"],
                      [[td(E(s["start"])), td(s["games"], "num"), td(pct(s["share"]), "num"),
                        td(E("、".join("%s %d" % kv for kv in s["by_side"].items()))), td(mmss(s["median_first_gank_min"]), "num"),
                        td(E("、".join("%s %d" % kv for kv in s["first_gank_lanes"].items())))] for s in J["starts"]]))
@@ -461,8 +468,8 @@ def _jungle_section(J, mm):
                    sg["first_gank_mid"], sg["first_gank_bot"], E(hp["basis"])))
     out.append(src_note(O["src"]))
     out.append("<h2>逐场开野记录%s</h2>" % inferred_badge())
-    out.append(table(["比赛 ID", "英雄", "阵营", "结果", "开野方式", "3:00 时约清了几组", "依据"],
-                     [[td(E(o["match_id"]), "mono"), td(E(o["champ_zh"])), td(E(o["side"])),
+    out.append(table(["比赛 ID", "英雄", "阵营·起手 buff", "结果", "开野方式", "3:00 时约清了几组", "依据"],
+                     [[td(E(o["match_id"]), "mono"), td(E(o["champ_zh"])), td(E("%s·%s" % (o["side"], o.get("start_buff") or "?"))),
                        td('<span class="wl %s">%s</span>' % ("w" if o["win"] else "l", "胜" if o["win"] else "负")),
                        td(E(o["pattern"])), td(num(o["camps_by_3_est"]), "num"), td(E(o["basis"]), "calc")] for o in J["openings"]],
                      "dense"))
@@ -606,6 +613,12 @@ def _ref_section(S, notes):
                 out.append("<h3>%s</h3>" % title)
                 out.append(table(["英雄", "技能", "名称", "冷却（秒）", "消耗"], rows, "dense"))
         out.append(src_note(ref["src"]))
+    if ref and ref.get("first_items"):
+        out.append("<h2>他常出的首件成装（Data Dragon %s）</h2>" % E(ref["first_items"][0]["version"]))
+        out.append(table(["装备", "作为首件成装的次数", "总价", "属性"],
+                         [[td("<b>%s</b>" % E(i["name_zh"])), td(i["times"], "num"), td(i["gold_total"], "num"),
+                           td(E(i["stats_text"] or "—"))] for i in ref["first_items"]]))
+        out.append(src_note(ref.get("items_src")))
     if notes:
         champs = set()
         if ref:
@@ -625,7 +638,7 @@ def _ref_section(S, notes):
 
 
 # ------------------------------------------------------------------ 页签：数据来源
-def _sources(S, st, mm, calib):
+def _sources(S, st, mm, calib, notes=None):
     m = S["meta"]
     out = ["<h2>下载记录</h2>"]
     kv = [("对手", m.get("riot_id")), ("PUUID", m.get("puuid")), ("服务器", "%s（%s）" % (m.get("platform"), m.get("platform_source"))),
@@ -662,9 +675,19 @@ def _sources(S, st, mm, calib):
         "时间线位置每分钟只记一次（frameInterval = 60000 ms），所有由位置推出来的路线、抓人、反野都标了“推测”并写了依据。",
         "被抓 = 击杀他的敌方英雄（击杀者 + 助攻）≥ 2 人。",
         m.get("item_rule", ""),
-        "估算清了几组野怪时假设每组约 %.0f 个补刀（未核实，只用于粗略估计）。" % (S.get("jungle") or {}).get("cs_per_camp_assumption", 4),
+        "估算清了几组野怪时按每组约 %.0f 个补刀算（英雄联盟 Wiki「Creep score」页面：整组野怪约 4 个补刀；石头人的分项加起来对不上，"
+        "只用于粗略估计）。" % (S.get("jungle") or {}).get("cs_per_camp_assumption", 4),
         G.GEOMETRY_SOURCE,
     ) if x))
+    if notes:
+        out.append("<h3>版本公告和外部资料</h3>")
+        out.append("<p>%s</p>" % E(notes.get("_说明", "")))
+        out.append("<ul>%s</ul>" % "".join(
+            '<li>%s：%s %s</li>' % (E(p.get("patch")), E(p.get("release")),
+                                    ('<a href="%s" rel="noopener" target="_blank">官方公告</a>' % E(safe_url(p.get("url"))))
+                                    if safe_url(p.get("url")) else "") for p in notes.get("patches", [])))
+    out.append('<p class="note">OP.GG：这个分析环境无法访问 OP.GG（网络策略拦截），对位胜率只采用你提供的 OP.GG 截图，'
+               '并在应对方案页写明版本、段位范围和样本量；没有截图的地方不写胜率。</p>')
     chk = S.get("checks") or {}
     incon = list((st or {}).get("inconsistencies") or [])
     for c in chk.get("challenges_mismatch") or []:
@@ -731,6 +754,7 @@ CSS = r"""
   --accent:#52b5bf; --accent-soft:#17323a; --s1:#3987e5; --s2:#d95926; --s3:#199e70;
   --t3:#6f7a88; color-scheme:dark}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.65;margin:0}
 .wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .synthetic{background:var(--bad);color:#fff;text-align:center;padding-block:6px;font-weight:700}
@@ -782,7 +806,8 @@ td .mk{font-style:normal;font-size:11px;color:var(--ink-2)}
 .maps{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:18px;align-items:start;margin-top:8px}
 .maps>*{min-width:0}
 figure.map{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px}
-figure.map svg{display:block;width:100%;max-width:560px;height:auto;aspect-ratio:1/1;border-radius:4px;background:var(--map-bg)}
+figure.map>svg{display:block;width:100%;max-width:560px;height:auto;aspect-ratio:1/1;border-radius:4px;background:var(--map-bg)}
+.lg svg{display:inline-block;width:14px;height:14px;flex:none}
 figcaption{display:flex;flex-direction:column;gap:4px;margin-top:8px;font-size:13px}
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;color:var(--ink-2)}
 .lg{display:inline-flex;align-items:center;gap:5px}
@@ -793,7 +818,7 @@ circle.pt,polygon.pt{fill-opacity:.95}
 .pt.ok{fill:var(--good)} .pt.maybe{fill:var(--warn)}
 g.pt.dead path{stroke:var(--bad);stroke-width:3.2;fill:none}
 g.pt.dead{stroke:none}
-.route{fill:none;stroke-width:2;opacity:.75;stroke-linejoin:round}
+.route{fill:none;stroke-width:1.4;opacity:.55;stroke-linejoin:round}
 .route.s1{stroke:var(--s1)} .route.s2{stroke:var(--s2)} .route.s3{stroke:var(--s3)} .route.s0{stroke:var(--s0)}
 .zl{fill:none;stroke:#fff;stroke-width:1.4;stroke-dasharray:6 5;opacity:.8}
 .zl.dim{opacity:.45}

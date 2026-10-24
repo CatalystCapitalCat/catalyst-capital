@@ -500,11 +500,11 @@ def write_refdata(static, plog, my_pool, csv_dir, log=print):
                     item_ids.add(int(row["item_id"]))
     with open(os.path.join(csv_dir, "items_ref.csv"), "w", encoding="utf-8-sig", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(["item_id", "name_zh", "version", "gold_total", "stats", "plaintext"])
+        w.writerow(["item_id", "name_zh", "version", "gold_total", "stats_text", "stats", "plaintext"])
         for iid in sorted(item_ids):
             it = static.items(static.latest).get(iid) if static.latest else None
             if it:
-                w.writerow([iid, it["name_zh"], it["version"], it["gold_total"],
+                w.writerow([iid, it["name_zh"], it["version"], it["gold_total"], it["stats_text"],
                             json.dumps(it["stats"], ensure_ascii=False, sort_keys=True), it["plaintext"]])
     log("参考数据：%d 个英雄技能（%s），%d 件成装" % (len(champs) - len(missing), static.latest, len(item_ids)))
     return {"champs": champs, "missing": missing}

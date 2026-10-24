@@ -79,6 +79,7 @@ class StaticData:
                 "completed": completed,
                 "stats": it.get("stats") or {},
                 "plaintext": clean_text(it.get("plaintext", "")),
+                "stats_text": stats_text(it.get("description", "")),
                 "version": version,
             }
         self._items[version] = out
@@ -106,6 +107,7 @@ class StaticData:
         if not c:
             return None
         st = c.get("stats") or {}
+        partype = c.get("partype", "")
         out = {"champ": champ_id, "name": c.get("name", champ_id), "title": c.get("title", ""),
                "version": self.latest,
                "passive": {"name": (c.get("passive") or {}).get("name", ""),
@@ -117,7 +119,8 @@ class StaticData:
             out["spells"].append({
                 "key": key, "name": sp.get("name", ""), "maxrank": sp.get("maxrank"),
                 "cooldown": sp.get("cooldownBurn") or "/".join(_fmt(x) for x in sp.get("cooldown") or []),
-                "cost": sp.get("costBurn", ""), "cost_type": clean_text(sp.get("costType", "")),
+                "cost": sp.get("costBurn", ""),
+                "cost_type": clean_text((sp.get("costType", "") or "").replace("{{ abilityresourcename }}", partype)),
                 "range": sp.get("rangeBurn", ""), "desc": clean_text(sp.get("description", "")),
             })
         return out
@@ -132,3 +135,12 @@ def clean_text(s):
     s = re.sub(r"<br\s*/?>", " ", s or "")
     s = re.sub(r"<[^>]+>", "", s)
     return re.sub(r"\s+", " ", html.unescape(s)).strip()
+
+
+def stats_text(description):
+    """装备描述里 <stats>…</stats> 那一段（属性），去掉标签。"""
+    m = re.search(r"<stats>(.*?)</stats>", description or "", re.S)
+    if not m:
+        return ""
+    parts = [clean_text(x) for x in re.split(r"<br\s*/?>", m.group(1))]
+    return "；".join(p for p in parts if p)
