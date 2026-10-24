@@ -1,0 +1,6 @@
+# 下载的原始数据和分析输出不进仓库
+lol_data_*/
+lol_data_*.zip
+out/
+__pycache__/
+*.pyc
