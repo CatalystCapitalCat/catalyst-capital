@@ -370,7 +370,8 @@ def _parse_one(ds, static, mid, W, plog):
         W["parts"].row(row)
 
     status = {"included": bool(g["included"]), "reason": reason or "", "has_timeline": bool(tl is not None),
-              "champ": g["champ"], "position": pos, "win": g["win"], "patch": patch}
+              "champ": g["champ"], "opp_champ": g.get("opp_champ") or "", "position": pos, "win": g["win"],
+              "patch": patch}
     if not g["included"]:
         return status
     if tl is None:
@@ -446,3 +447,54 @@ def _events_rows(mid, events, pid_team, pid_champ, my_pid, opp_pid, my_team, W):
                 "killer_pid": killer, "his_team_destroyed": int(owner != "" and owner != my_team),
                 "him_involved": int(my_pid == killer or my_pid in assists),
             })
+
+
+def write_refdata(static, plog, my_pool, csv_dir, log=print):
+    """参考数据（只来自 Data Dragon 当前版本）：
+    champion_spells.csv  他用过的英雄、对位英雄、我的英雄池：被动和 QWER 的名字、冷却、消耗、距离
+    items_ref.csv        他和对位买过的成装：价格、属性
+    """
+    champs = []
+    for s in plog["matches"].values():
+        if s.get("included"):
+            for c in (s.get("champ"), s.get("opp_champ")):
+                if c and c not in champs:
+                    champs.append(c)
+    for c in my_pool:
+        if c not in champs:
+            champs.append(c)
+    n = 0
+    missing = []
+    with open(os.path.join(csv_dir, "champion_spells.csv"), "w", encoding="utf-8-sig", newline="") as fh:
+        w = csv.writer(fh)
+        w.writerow(["champ", "name_zh", "version", "slot", "spell_name", "cooldown", "cost", "cost_type", "range",
+                    "maxrank", "description"])
+        for c in champs:
+            sp = static.spells(c)
+            if not sp:
+                missing.append(c)
+                continue
+            w.writerow([c, sp["name"], sp["version"], "P", sp["passive"]["name"], "", "", "", "", "", sp["passive"]["desc"]])
+            for x in sp["spells"]:
+                w.writerow([c, sp["name"], sp["version"], x["key"], x["name"], x["cooldown"], x["cost"], x["cost_type"],
+                            x["range"], x["maxrank"], x["desc"]])
+                n += 1
+    if missing:
+        log("  championFull 里找不到：%s（Data Dragon 完整英雄数据缺失或英雄名不匹配）" % "、".join(missing))
+    item_ids = set()
+    items_path = os.path.join(csv_dir, "items.csv")
+    if os.path.exists(items_path):
+        with open(items_path, encoding="utf-8-sig", newline="") as fh:
+            for row in csv.DictReader(fh):
+                if row.get("completed") == "1":
+                    item_ids.add(int(row["item_id"]))
+    with open(os.path.join(csv_dir, "items_ref.csv"), "w", encoding="utf-8-sig", newline="") as fh:
+        w = csv.writer(fh)
+        w.writerow(["item_id", "name_zh", "version", "gold_total", "stats", "plaintext"])
+        for iid in sorted(item_ids):
+            it = static.items(static.latest).get(iid) if static.latest else None
+            if it:
+                w.writerow([iid, it["name_zh"], it["version"], it["gold_total"],
+                            json.dumps(it["stats"], ensure_ascii=False, sort_keys=True), it["plaintext"]])
+    log("参考数据：%d 个英雄技能（%s），%d 件成装" % (len(champs) - len(missing), static.latest, len(item_ids)))
+    return {"champs": champs, "missing": missing}

@@ -146,7 +146,7 @@ def legend_sym(cls, shape="circle"):
 
 
 # ------------------------------------------------------------------ 主函数
-def render(summary, strategy, map_png, out_dir, calib=None):
+def render(summary, strategy, map_png, out_dir, calib=None, notes=None):
     S = summary
     st = strategy or {}
     mm = MiniMap(map_png)
@@ -155,7 +155,7 @@ def render(summary, strategy, map_png, out_dir, calib=None):
         ("pool", "英雄池", _pool(S)),
         ("jungle" if S.get("jungle") else "lane", "打野" if S.get("jungle") else "对线", _lane_jungle(S, mm)),
         ("deaths", "死亡分布", _deaths(S, mm)),
-        ("plan", "应对方案", _plan(S, st)),
+        ("plan", "应对方案", _plan(S, st) + _ref_section(S, notes)),
         ("sources", "数据来源", _sources(S, st, mm, calib)),
     ]
     m = S["meta"]
@@ -556,6 +556,43 @@ def _plan(S, st):
                            td(E(str(x.get("sample", "未核实")))), td(E(x.get("note", "")))] for x in ms]))
     if st.get("fact_vs_inference"):
         out.append("<h3>哪些是数据、哪些是推测</h3><ul>%s</ul>" % "".join("<li>%s</li>" % E(x) for x in st["fact_vs_inference"]))
+    return "".join(out)
+
+
+def _ref_section(S, notes):
+    """英雄技能（Data Dragon 当前版本）+ 最近两个版本的改动（官方公告/Wiki，带链接）。"""
+    out = []
+    ref = S.get("ref")
+    if ref and (ref["his"] or ref["mine"]):
+        out.append("<h2>英雄技能冷却（Data Dragon %s）</h2>" % E(ref["version"] or "?"))
+        out.append('<p class="note">冷却为各等级的秒数（Data Dragon 原始数据，未计入技能急速）；消耗、距离同样来自 Data Dragon。</p>')
+        for title, key in (("他常用的英雄", "his"), ("我的英雄池", "mine")):
+            rows = []
+            for c in ref[key]:
+                if c.get("missing"):
+                    rows.append([td("<b>%s</b>" % E(c["name_zh"])), td("Data Dragon 里没有找到", ""), td(""), td(""), td("")])
+                    continue
+                for i, sp in enumerate(c["spells"]):
+                    rows.append([td("<b>%s</b>" % E(c["name_zh"]) if i == 0 else ""), td(E(sp["slot"])), td(E(sp["spell_name"])),
+                                 td(E(sp["cooldown"] or "—"), "num"), td(E(" ".join(x for x in (sp["cost"], sp["cost_type"]) if x) or "—"))])
+            if rows:
+                out.append("<h3>%s</h3>" % title)
+                out.append(table(["英雄", "技能", "名称", "冷却（秒）", "消耗"], rows, "dense"))
+        out.append(src_note(ref["src"]))
+    if notes:
+        champs = set()
+        if ref:
+            champs = {c["champ"] for c in ref["his"] + ref["mine"]} | {c["name_zh"] for c in ref["his"] + ref["mine"]}
+        rows = []
+        for n in notes.get("items", []):
+            subj = n.get("subject", "")
+            if n.get("category") != "champion" or subj in champs or n.get("champ_id") in champs:
+                rows.append([td(E(n.get("patch", ""))), td(E(subj)), td(E(n.get("direction_zh", n.get("direction", "")))),
+                             td(E(n.get("change", ""))),
+                             td('<a href="%s" rel="noopener" target="_blank">%s</a>' % (E(n.get("source_url", "")), E(n.get("source_name", "来源"))))])
+        out.append("<h2>最近两个版本的相关改动</h2>")
+        out.append('<p class="note">%s</p>' % E(notes.get("note", "只列出他常用的英雄、我的英雄池和野区/资源相关的改动。")))
+        out.append(table(["版本", "对象", "方向", "改动", "来源"], rows, "dense") if rows else "<p>这两个版本里没有相关改动。</p>")
     return "".join(out)
 
 

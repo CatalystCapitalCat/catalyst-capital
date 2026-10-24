@@ -8,7 +8,8 @@
   2. league-v4：查他当前的单双排段位
   3. match-v5：下载最近 N 场单双排（queue 420）的对局详情 + 时间线
   4. league-v4：（可关）查每场对面同位置玩家的当前段位，用来判断对局是不是同段位
-  5. Data Dragon：当前版本（以及对局所在版本）的英雄、装备数据和召唤师峡谷小地图 map11.png
+  5. Data Dragon：当前版本（以及对局所在版本）的英雄、装备数据，当前版本的完整英雄技能数据
+     （championFull.json：技能冷却/消耗/距离）和召唤师峡谷小地图 map11.png
   6. 每个原始 JSON 按比赛 ID 单独存文件，manifest.json 记下每个文件的下载时间、接口、大小、sha256，
      最后整个目录打包成 zip
 
@@ -536,6 +537,9 @@ def download_ddragon(client, store, manifest, log, match_patches):
                  ("item_en_US.json", "/cdn/%s/data/en_US/item.json" % ver)]
         if ver == latest:
             files.append(("map11.png", "/cdn/%s/img/map/map11.png" % ver))
+            # 完整英雄数据（技能名、冷却、消耗、距离），分析时从这里读技能数值
+            files.append(("championFull_zh_CN.json", "/cdn/%s/data/zh_CN/championFull.json" % ver))
+            files.append(("championFull_en_US.json", "/cdn/%s/data/en_US/championFull.json" % ver))
         for name, path in files:
             rel = "ddragon/%s/%s" % (ver, name)
             if rel in manifest["files"] and os.path.exists(os.path.join(store.root, *rel.split("/"))):

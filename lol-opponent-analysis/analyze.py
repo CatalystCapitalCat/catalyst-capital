@@ -26,6 +26,9 @@ from lolanalysis import stats as ST  # noqa: E402
 from lolanalysis.dataset import open_dataset  # noqa: E402
 from lolanalysis.staticdata import COMPLETED_RULE, StaticData  # noqa: E402
 
+# 我的英雄池：武器大师、荒漠屠夫（鳄鱼）、机械公敌（兰博）、铁血狼母（安蓓萨）
+MY_POOL = "Jax,Renekton,Rumble,Ambessa"
+
 
 def ds_meta(ds):
     m = ds.manifest
@@ -49,9 +52,13 @@ def cmd_parse(args):
     os.makedirs(args.out, exist_ok=True)
     ds = open_dataset(args.data, args.out)
     static = StaticData(ds)
-    P.parse_dataset(ds, static, args.out)
+    plog = P.parse_dataset(ds, static, args.out)
+    P.write_refdata(static, plog, [c.strip() for c in args.my_pool.split(",") if c.strip()],
+                    os.path.join(args.out, "csv"))
+    meta = ds_meta(ds)
+    meta["my_pool"] = [c.strip() for c in args.my_pool.split(",") if c.strip()]
     with open(os.path.join(args.out, "ds_meta.json"), "w", encoding="utf-8") as fh:
-        json.dump(ds_meta(ds), fh, ensure_ascii=False, indent=1)
+        json.dump(meta, fh, ensure_ascii=False, indent=1)
     mp = ds.map_image()
     with open(os.path.join(args.out, "map_path.txt"), "w", encoding="utf-8") as fh:
         fh.write(mp or "")
@@ -126,7 +133,11 @@ def cmd_report(args):
             calib = json.load(fh)
     with open(os.path.join(args.out, "map_path.txt"), encoding="utf-8") as fh:
         mp = fh.read().strip() or None
-    full, frag = R.render(S, strategy, mp, args.out, calib)
+    notes = None
+    if args.patch_notes:
+        with open(args.patch_notes, encoding="utf-8") as fh:
+            notes = json.load(fh)
+    full, frag = R.render(S, strategy, mp, args.out, calib, notes)
     print("仪表板：%s（%.0f KB）" % (full, os.path.getsize(full) / 1024))
 
 
@@ -136,13 +147,17 @@ def main(argv=None):
     for name in ("all", "parse"):
         p = sub.add_parser(name)
         p.add_argument("data", help="download_riot.py 打出来的 zip 或解压后的目录")
+        p.add_argument("--my-pool", default=MY_POOL,
+                       help="我的英雄池（Data Dragon 英雄 id，逗号分隔；默认：%(default)s）")
         p.add_argument("--out", required=True)
         p.add_argument("--strategy", default=None)
+        p.add_argument("--patch-notes", default=None, help="版本公告摘录（JSON，见 patch_notes.example.json）")
         p.add_argument("--games", type=int, default=3)
     for name in ("stats", "calibrate", "report"):
         p = sub.add_parser(name)
         p.add_argument("--out", required=True)
         p.add_argument("--strategy", default=None)
+        p.add_argument("--patch-notes", default=None, help="版本公告摘录（JSON，见 patch_notes.example.json）")
         p.add_argument("--games", type=int, default=3, help="核对图画几场（calibrate）")
     args = ap.parse_args(argv)
     if args.cmd == "parse":

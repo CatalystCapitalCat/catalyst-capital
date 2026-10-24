@@ -1,0 +1,27 @@
+{
+  "_说明": "版本公告摘录的格式（analyze.py report --patch-notes 用）。每条必须有版本号和来源链接；这里只是格式示例。",
+  "note": "只列出他常用的英雄、我的英雄池和野区/资源相关的改动。",
+  "items": [
+    {
+      "patch": "26.NN",
+      "category": "champion",
+      "subject": "英雄中文名",
+      "champ_id": "Data Dragon 英雄 id，例如 Jax",
+      "direction": "buff",
+      "direction_zh": "加强",
+      "change": "改动内容（改动前 → 改动后）",
+      "source_url": "https://www.leagueoflegends.com/en-us/news/game-updates/...",
+      "source_name": "官方 26.NN 更新公告"
+    },
+    {
+      "patch": "26.NN",
+      "category": "objective",
+      "subject": "虚空巢虫",
+      "direction": "info",
+      "direction_zh": "当前数值",
+      "change": "刷新时间等",
+      "source_url": "https://wiki.leagueoflegends.com/en-us/...",
+      "source_name": "英雄联盟 Wiki"
+    }
+  ]
+}

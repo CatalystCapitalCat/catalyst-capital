@@ -5,6 +5,9 @@ Data Dragon 的 item.json 没有"传说装备"字段，所以"成装"用规则�
   总价 ≥ COMPLETED_MIN_GOLD、不是鞋/消耗品/饰品、没有 requiredChampion / requiredAlly（奥恩升级装）。
 """
 
+import html
+import re
+
 COMPLETED_MIN_GOLD = 2000
 EXCLUDED_TAGS = {"Boots", "Consumable", "Trinket", "Jungle", "Lane", "GoldPer"}
 COMPLETED_RULE = ("成装 = 召唤师峡谷可用、商店可直接购买、总价 ≥ %d 金币、"
@@ -64,6 +67,9 @@ class StaticData:
                 "name_en": (en_data.get(iid) or {}).get("name", it.get("name", iid)),
                 "gold_total": gold.get("total") or 0,
                 "completed": completed,
+                "stats": it.get("stats") or {},
+                "plaintext": clean_text(it.get("plaintext", "")),
+                "version": version,
             }
         self._items[version] = out
         return out
@@ -74,3 +80,45 @@ class StaticData:
         if info is None and self.latest and ver != self.latest:
             info = self.items(self.latest).get(int(item_id))
         return info
+
+    # ------------------------------------------------------------ 技能（championFull.json）
+    def _full(self):
+        if not hasattr(self, "_full_cache"):
+            self._full_cache = (self.ds.ddragon_json(self.latest, "championFull_zh_CN.json") or {}).get("data") or {}
+        return self._full_cache
+
+    def has_spell_data(self):
+        return bool(self._full())
+
+    def spells(self, champ_id):
+        """当前版本的技能数据：名字、冷却、消耗、距离（来自 Data Dragon championFull.json，zh_CN）。"""
+        c = self._full().get(champ_id)
+        if not c:
+            return None
+        st = c.get("stats") or {}
+        out = {"champ": champ_id, "name": c.get("name", champ_id), "title": c.get("title", ""),
+               "version": self.latest,
+               "passive": {"name": (c.get("passive") or {}).get("name", ""),
+                           "desc": clean_text((c.get("passive") or {}).get("description", ""))},
+               "spells": [],
+               "stats": {k: st.get(k) for k in ("hp", "hpperlevel", "armor", "armorperlevel", "attackdamage",
+                                                 "attackdamageperlevel", "attackrange", "movespeed")}}
+        for key, sp in zip("QWER", c.get("spells") or []):
+            out["spells"].append({
+                "key": key, "name": sp.get("name", ""), "maxrank": sp.get("maxrank"),
+                "cooldown": sp.get("cooldownBurn") or "/".join(_fmt(x) for x in sp.get("cooldown") or []),
+                "cost": sp.get("costBurn", ""), "cost_type": clean_text(sp.get("costType", "")),
+                "range": sp.get("rangeBurn", ""), "desc": clean_text(sp.get("description", "")),
+            })
+        return out
+
+
+def _fmt(x):
+    return ("%g" % x) if isinstance(x, (int, float)) else str(x)
+
+
+def clean_text(s):
+    """去掉 Data Dragon 文本里的 HTML 标签。"""
+    s = re.sub(r"<br\s*/?>", " ", s or "")
+    s = re.sub(r"<[^>]+>", "", s)
+    return re.sub(r"\s+", " ", html.unescape(s)).strip()

@@ -46,7 +46,8 @@ python download_riot.py --riot-id "名字#TAG" --platform euw1 --count 20
 1. account-v1 查 PUUID → league-v4 查当前单双排段位
 2. match-v5 取最近 20 场单双排（queue 420）的比赛 ID，逐场下载对局详情和时间线
 3. league-v4 查每场对面同位置玩家的当前段位（用来检验“同段位”；不想要加 `--no-opponent-ranks`）
-4. Data Dragon 下载当前版本（和对局所在版本）的英雄、装备数据和召唤师峡谷小地图 `map11.png`
+4. Data Dragon 下载当前版本（和对局所在版本）的英雄、装备数据，当前版本的完整英雄技能数据
+   `championFull.json`（技能冷却、消耗、距离），以及召唤师峡谷小地图 `map11.png`
 5. 打包成 `lol_data_日期_时间.zip`
 
 总共大约 65 次请求，正常 1–2 分钟跑完。遇到 429（请求太频繁）会按服务器给的等待时间自动暂停再继续；
@@ -78,7 +79,7 @@ lol_data_时间/
   matches/<比赛ID>.json     对局详情（match-v5），一场一个文件
   timelines/<比赛ID>.json   时间线（match-v5），一场一个文件
   lane_opponent_ranks.json 每场对面同位置玩家的当前段位
-  ddragon/<版本>/           champion / item（中、英）和 map11.png
+  ddragon/<版本>/           champion / item（中、英）；当前版本另有 championFull（技能冷却等）和 map11.png
   download_log.txt         运行日志
 ```
 

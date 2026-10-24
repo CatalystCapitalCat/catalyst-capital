@@ -31,6 +31,7 @@ STR_COLS = {
     "side", "position", "position_zh", "skill_order_1_3", "opp_puuid", "opp_name", "opp_champ", "opp_champ_zh",
     "first_item_name", "puuid", "riot_id", "zone", "assist_pids", "killer_champ", "victim_champ", "monster_type",
     "sub_type", "building_type", "tower_type", "lane_type", "who", "name_zh",
+    "version", "slot", "spell_name", "cooldown", "cost", "cost_type", "range", "description", "stats", "plaintext",
 }
 
 
@@ -136,6 +137,7 @@ def compute(out_dir, ds_meta, log=print):
     S["weakness"] = _weakness(games, tl_games, kills, frames, parts, src)
     S["ban"] = _ban(S["champ_pool"], src)
     S["lobby_ranks"] = _lobby_ranks(ds_meta, main_games, src)
+    S["ref"] = _ref(C, S["champ_pool"], ds_meta.get("my_pool") or [])
     S["checks"] = {"challenges_mismatch": plog.get("challenges_mismatch", []),
                    "geometry_selftest_failures": [list(map(str, b)) for b in G.self_test()]}
     with open(os.path.join(out_dir, "summary.json"), "w", encoding="utf-8") as fh:
@@ -853,6 +855,30 @@ def _ban(pool, src):
                     "（(胜+5)/(场+10)，相当于先假设 10 场 50% 胜率，避免 2 场 2 胜这种小样本排到最前）；"
                     "取平滑胜率 ≥50% 的前 1–2 个",
             "src": pool["src"]}
+
+
+def _ref(C, pool, my_pool, top_n=4):
+    """Data Dragon 当前版本的技能数据：他最常用的几个英雄 + 我的英雄池。"""
+    path = os.path.join(C, "champion_spells.csv")
+    if not os.path.exists(path):
+        return None
+    rows = read_csv(path)
+    by = defaultdict(list)
+    for r in rows:
+        by[r["champ"]].append(r)
+    his = [c["champ"] for c in pool["rows"][:top_n]]
+    out = {"version": rows[0]["version"] if rows else None, "his": [], "mine": []}
+    for key, champs in (("his", his), ("mine", my_pool)):
+        for c in champs:
+            if c in by:
+                rs = by[c]
+                out[key].append({"champ": c, "name_zh": rs[0]["name_zh"],
+                                 "spells": [{k: r[k] for k in ("slot", "spell_name", "cooldown", "cost", "cost_type", "range")}
+                                            for r in rs]})
+            else:
+                out[key].append({"champ": c, "name_zh": c, "spells": [], "missing": True})
+    out["src"] = "Data Dragon %s championFull.json（zh_CN）" % (out["version"] or "?")
+    return out
 
 
 def _lobby_ranks(ds_meta, main_games, src):
