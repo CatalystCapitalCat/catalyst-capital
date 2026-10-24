@@ -217,7 +217,9 @@ def _opp_agg(gs):
     D = sum(g["opp_deaths"] for g in gs)
     A = sum(g["opp_assists"] for g in gs)
     return {"games": n, "kda": (K + A) / max(1, D), "avg_d": D / n,
-            "cs_per_min": mean(g["opp_cs_per_min"] for g in gs), "dmg_share": mean(g["opp_dmg_share"] for g in gs),
+            "cs_per_min": (sum(g["opp_cs_per_min"] * g["duration_min"] for g in gs) / sum(g["duration_min"] for g in gs)
+                           if sum(g["duration_min"] for g in gs) else None),
+            "dmg_share": mean(g["opp_dmg_share"] for g in gs),
             "kp": mean(g["opp_kp"] for g in gs), "vision_per_min": mean(g["opp_vision_per_min"] for g in gs)}
 
 
@@ -239,25 +241,35 @@ def _baseline(main_games, parts, src):
             rows.append({"metric": key, "label": zh, "his": his[key], "base": opp[key], "n_base": opp["games"],
                          "rating": rate(his[key], opp[key], hb, n_base=opp["games"]), "higher_better": hb})
     # 首件成装时间（越早越好）、10/15 分钟对位差（基准为 0）
-    fi = [g["first_item_time_s"] for g in main_games if g.get("first_item_time_s") is not None]
-    ofi = [g["opp_first_item_time_s"] for g in main_games if g.get("opp_first_item_time_s") is not None]
-    if fi:
-        rows.append({"metric": "first_item_min", "label": "首件成装时间（分钟）", "his": mean(fi) / 60.0,
-                     "base": mean(ofi) / 60.0 if ofi else None, "n_base": len(ofi),
-                     "rating": rate(mean(fi), mean(ofi) if ofi else None, False, n_base=len(ofi)),
-                     "higher_better": False})
+    fi = _first_item_pair(main_games)
+    if fi["n_pair"]:
+        rows.append({"metric": "first_item_min", "label": "首件成装时间（分钟，中位数，只比两人都做出成装的场次）",
+                     "his": fi["his_median"], "base": fi["opp_median"], "n_base": fi["n_pair"],
+                     "rating": rate(fi["his_median"], fi["opp_median"], False, n_base=fi["n_pair"]),
+                     "higher_better": False, "note": fi["note"]})
     for key, zh in (("gold_diff_10", "10 分钟经济差"), ("gold_diff_15", "15 分钟经济差"), ("xp_diff_10", "10 分钟经验差"),
                     ("cs_diff_10", "10 分钟补刀差"), ("cs_diff_15", "15 分钟补刀差")):
         xs = [g[key] for g in main_games if g.get(key) is not None]
         if xs:
             rows.append({"metric": key, "label": zh + "（对位）", "his": mean(xs), "base": 0, "n_base": len(xs),
-                         "rating": rate(mean(xs), 0, True, band=DIFF_BANDS[key], absolute=True),
+                         "rating": rate(mean(xs), 0, True, band=DIFF_BANDS[key], absolute=True, n_base=len(xs)),
                          "higher_better": True, "abs_band": DIFF_BANDS[key]})
     return {"rows": rows, "n": len(main_games), "small": len(main_games) < SMALL_N,
             "rule": "基准 = 同一批对局中对面同位置玩家的平均值；相对差在 ±%d%% 以内为黄，"
                     "更好为绿，更差为红；对位差值按绝对区间（如 10 分钟经济差 ±%d 金）判断；样本 < 3 为灰"
                     % (int(REL_BAND * 100), DIFF_BANDS["gold_diff_10"]),
             "src": src(main_games)}
+
+
+def _first_item_pair(gs):
+    """首件成装：只比两人都做出成装的场次（中位数，分钟）；另外报告各自没做出成装的场数。"""
+    pair = [g for g in gs if g.get("first_item_time_s") is not None and g.get("opp_first_item_time_s") is not None]
+    his_none = sum(1 for g in gs if g.get("has_timeline") == 1 and g.get("first_item_time_s") is None)
+    opp_none = sum(1 for g in gs if g.get("has_timeline") == 1 and g.get("opp_pid") is not None
+                   and g.get("opp_first_item_time_s") is None)
+    return {"n_pair": len(pair), "his_median": median(g["first_item_time_s"] / 60.0 for g in pair),
+            "opp_median": median(g["opp_first_item_time_s"] / 60.0 for g in pair),
+            "note": "两人都做出成装的 %d 场；他没做出成装 %d 场，对位没做出 %d 场" % (len(pair), his_none, opp_none)}
 
 
 def _champ_pool(games, src):
@@ -386,12 +398,12 @@ def _lane(games, tl_games, kills, src):
             xs = [g[key] for g in gs if g.get(key) is not None]
             row[key] = {"mean": mean(xs), "median": median(xs), "n": len(xs),
                         "ahead_share": pct(sum(1 for x in xs if x > 0), len(xs)),
-                        "rating": rate(mean(xs), 0, True, band=DIFF_BANDS.get(key, 1000), absolute=True)
-                        if xs else "grey"}
-        fi = [g["first_item_time_s"] / 60.0 for g in gs if g.get("first_item_time_s") is not None]
-        ofi = [g["opp_first_item_time_s"] / 60.0 for g in gs if g.get("opp_first_item_time_s") is not None]
-        row["first_item"] = {"mean": mean(fi), "median": median(fi), "n": len(fi), "opp_mean": mean(ofi),
-                             "opp_n": len(ofi), "rating": rate(mean(fi), mean(ofi), False, n_base=len(ofi)),
+                        "rating": rate(mean(xs), 0, True, band=DIFF_BANDS.get(key, 1000), absolute=True,
+                                       n_base=len(xs)) if xs else "grey"}
+        fp = _first_item_pair(gs)
+        row["first_item"] = {"median": fp["his_median"], "opp_median": fp["opp_median"], "n": fp["n_pair"],
+                             "note": fp["note"],
+                             "rating": rate(fp["his_median"], fp["opp_median"], False, n_base=fp["n_pair"]),
                              "items": dict(Counter(g["first_item_name"] for g in gs if g.get("first_item_name")))}
         out["by_position"][pos] = row
     # 前 10 分钟的击杀/死亡/助攻
@@ -588,9 +600,12 @@ def _opening(g, fr):
 
 
 def _gank_episodes(g, fr, ks):
-    """他每次去线上的经历：击杀事件（直接数据）+ 整分钟位置（推测），合并去重。"""
-    eps = []
+    """他每次去线上的经历。
+    直接数据：击杀事件（他是击杀/助攻/阵亡者）发生在线上或河道口；同一路 60 秒内的多个事件算一次。
+    推测：第 2–13 分钟整分钟位置在线上/河道口。同一路连续几分钟算一次"去线上"，
+    这段时间前后 1 分钟内有同一路的击杀事件就并到那次事件里，没有才记为"没有击杀"。"""
     team = g["team_id"]
+    evs = []
     for k in ks:
         if not k["him_role"] or k["t_min"] >= 14 or k["x"] is None:
             continue
@@ -603,31 +618,41 @@ def _gank_episodes(g, fr, ks):
             result = "他阵亡"
         else:
             continue
-        eps.append({"t_min": k["t_min"], "t_label": mmss(k["t_min"]), "lane": lane, "result": result,
+        evs.append({"t_min": k["t_min"], "t_label": mmss(k["t_min"]), "lane": lane, "result": result,
                     "inferred": False, "basis": "击杀事件 %s，坐标(%d,%d)，%s" % (mmss(k["t_min"]), k["x"], k["y"],
                                                                          G.ZONE_NAMES.get(k["zone"], k["zone"]))})
-    # 同一路 60 秒内的多个事件算一次
-    eps.sort(key=lambda e: e["t_min"])
+    evs.sort(key=lambda e: e["t_min"])
     merged = []
-    for e in eps:
-        if merged and merged[-1]["lane"] == e["lane"] and e["t_min"] - merged[-1]["t_min"] <= 1.0:
-            if e["result"].startswith("抓到") and not merged[-1]["result"].startswith("抓到"):
-                merged[-1]["result"] = e["result"]
+    for e in evs:
+        last = merged[-1] if merged else None
+        if last and last["lane"] == e["lane"] and e["t_min"] - last["_end"] <= 1.0:
+            last["_end"] = e["t_min"]
+            if e["result"].startswith("抓到"):
+                last["result"] = e["result"]  # 只要有一次击杀/助攻就算抓到了
             continue
+        e["_end"] = e["t_min"]
         merged.append(e)
-    # 整分钟位置
-    prev_lane = None
+    # 整分钟位置：同一路连续的分钟合成一段
+    runs = []
     for m in range(2, 14):
         f = fr.get(m)
         lane = G.gank_lane(f["x"], f["y"]) if f and f["x"] is not None else None
-        if lane and lane != prev_lane:
-            near = [e for e in merged if e["lane"] == lane and m - 1.0 <= e["t_min"] <= m + 1.0]
-            if not near:
-                merged.append({"t_min": m - 0.5, "t_label": "约 %d:30–%d:00" % (m - 1, m), "lane": lane,
-                               "result": "没有击杀（没抓成或只是路过/拿河蟹）", "inferred": True,
-                               "basis": "%d:00 位置(%d,%d) 在%s" % (m, f["x"], f["y"],
-                                                                 G.ZONE_NAMES.get(f["zone"], f["zone"]))})
-        prev_lane = lane
+        if lane and runs and runs[-1]["lane"] == lane and runs[-1]["m_b"] == m - 1:
+            runs[-1]["m_b"] = m
+        elif lane:
+            runs.append({"lane": lane, "m_a": m, "m_b": m, "f": f})
+    for r in runs:
+        near = [e for e in merged if e["lane"] == r["lane"] and r["m_a"] - 1.0 <= e["t_min"] <= r["m_b"] + 1.0]
+        if near:
+            continue
+        f = r["f"]
+        span = ("%d:00" % r["m_a"]) if r["m_a"] == r["m_b"] else ("%d:00–%d:00" % (r["m_a"], r["m_b"]))
+        merged.append({"t_min": r["m_a"] - 0.5, "t_label": "约 %d:30–%d:00" % (r["m_a"] - 1, r["m_a"]), "lane": r["lane"],
+                       "result": "没有击杀（没抓成或只是路过/拿河蟹）", "inferred": True,
+                       "basis": "%s 的整分钟位置在%s，例如 %d:00 位置(%d,%d)" % (
+                           span, G.ZONE_NAMES[r["lane"]], r["m_a"], f["x"], f["y"])})
+    for e in merged:
+        e.pop("_end", None)
     merged.sort(key=lambda e: e["t_min"])
     return merged
 
@@ -729,20 +754,24 @@ def _half_pref(jg, fr_by, first, objectives):
                 else:
                     bot += 1
     fg = Counter(f["lane_code"] for f in first if f["lane_code"])
-    fo = dict(objectives["first_objective_of_his_team"])
+    fo = dict(tuple(x) for x in objectives["first_objective_of_his_team"])
     signals = {"frames_top_share": pct(top, top + bot), "frames_n": top + bot,
                "first_gank_top": fg.get("TOP", 0), "first_gank_bot": fg.get("BOT", 0), "first_gank_mid": fg.get("MID", 0),
                "first_obj_grubs_or_herald": fo.get("HORDE", 0) + fo.get("RIFTHERALD", 0), "first_obj_dragon": fo.get("DRAGON", 0)}
+
+    def vote(a, b):  # 场次差 ≥2 才投票
+        return 1 if a - b >= 2 else (-1 if b - a >= 2 else 0)
+
     score = 0
     if signals["frames_top_share"] is not None:
-        score += 1 if signals["frames_top_share"] > 0.55 else (-1 if signals["frames_top_share"] < 0.45 else 0)
-    score += (signals["first_gank_top"] > signals["first_gank_bot"]) - (signals["first_gank_bot"] > signals["first_gank_top"])
-    score += (signals["first_obj_grubs_or_herald"] > signals["first_obj_dragon"]) - \
-             (signals["first_obj_dragon"] > signals["first_obj_grubs_or_herald"])
+        score += 1 if signals["frames_top_share"] >= 0.60 else (-1 if signals["frames_top_share"] <= 0.40 else 0)
+    score += vote(signals["first_gank_top"], signals["first_gank_bot"])
+    score += vote(signals["first_obj_grubs_or_herald"], signals["first_obj_dragon"])
     verdict = "偏上半区（上路/巢虫）" if score >= 2 else ("偏下半区（下路/小龙）" if score <= -2 else "没有明显偏向")
-    return {"signals": signals, "score": score, "verdict": verdict, "inferred": True,
-            "basis": "三个信号各记 +1（上半）/−1（下半）：3–14 分钟整分钟位置在上半区的比例（>55% / <45%）、"
-                     "第一次抓人去上路还是下路的场次多、他所在队伍拿的第一个资源是巢虫/先锋还是小龙；合计 ≥2 判上半，≤−2 判下半"}
+    return {"signals": signals, "score": score, "verdict": verdict, "inferred": True, "small": len(jg) < SMALL_N,
+            "basis": "三个信号各记 +1（上半）/−1（下半）/0：3–14 分钟整分钟位置在上半区的比例（≥60% / ≤40%）；"
+                     "第一次抓人去上路和去下路的场次（相差 ≥2 场才算）；他所在队伍拿的第一个资源是巢虫/先锋还是小龙"
+                     "（相差 ≥2 场才算；注意小龙 5:00 刷新、巢虫 8:00 刷新，小龙天然更早）。合计 ≥2 判上半，≤−2 判下半"}
 
 
 # ---------------------------------------------------------------- 死亡分布
@@ -757,15 +786,21 @@ def _deaths(tl_games, kills, src):
                          "executed": k["executed"], "killer": k["killer_champ"], "champ_zh": g["champ_zh"],
                          "side": g["side"], "win": g["win"]})
     early = [r for r in rows if r["t_min"] < 10]
-    bins = [("0:00–2:59", 0, 3), ("3:00–5:59", 3, 6), ("6:00–9:59", 6, 10)]
+    bins = [("0:00–1:59", 0, 2), ("2:00–3:59", 2, 4), ("4:00–5:59", 4, 6), ("6:00–7:59", 6, 8), ("8:00–9:59", 8, 10)]
     tb = [{"bin": b, "deaths": sum(1 for r in early if lo <= r["t_min"] < hi)} for b, lo, hi in bins]
     zc = Counter(r["zone"] for r in early).most_common()
     allz = Counter(r["zone"] for r in rows).most_common()
     return {"rows": rows, "n_games": len(tl_games), "total": len(rows), "early_total": len(early),
             "early_zone_counts": zc, "all_zone_counts": allz, "early_time_bins": tb,
             "early_top_zone": zc[0] if zc else None,
-            "early_top_bin": max(tb, key=lambda b: b["deaths"]) if early else None,
+            "early_top_bin": _top_bin(tb) if early else None,
             "src": src(tl_games, "match-v5 时间线 CHAMPION_KILL 事件（他是受害者）")}
+
+
+def _top_bin(tb):
+    top = max(b["deaths"] for b in tb)
+    winners = [b["bin"] for b in tb if b["deaths"] == top]
+    return {"bin": "、".join(winners) + ("（并列）" if len(winners) > 1 else ""), "deaths": top}
 
 
 # ---------------------------------------------------------------- 弱点
@@ -849,8 +884,13 @@ def _ban(pool, src):
                                 r["wins"], r["games"], 100 * r["smoothed_wr"])})
     cand = [r for r in rows if r["games"] >= 3]
     cand.sort(key=lambda r: (-r["net_wins"], -r["games"], -r["smoothed_wr"]))
-    picks = [r for r in cand if r["smoothed_wr"] >= 0.5][:2] or cand[:1]
-    return {"rows": rows, "recommend": picks,
+    picks = [r for r in cand if r["smoothed_wr"] >= 0.5][:2]
+    fallback = None
+    if not picks and cand:
+        best = max(cand, key=lambda r: r["games"])
+        picks = [best]
+        fallback = "没有“≥3 场且平滑胜率 ≥50%”的英雄，改按场次最多推荐（他在这个英雄上胜率并不高，禁它只是限制他的熟练英雄）"
+    return {"rows": rows, "recommend": picks, "fallback": fallback, "small": sum(r["games"] for r in rows) < SMALL_N,
             "rule": "只考虑他玩过 ≥3 场的英雄；按净胜场（胜 − 负）从高到低排，平手看场次，再看平滑胜率"
                     "（(胜+5)/(场+10)，相当于先假设 10 场 50% 胜率，避免 2 场 2 胜这种小样本排到最前）；"
                     "取平滑胜率 ≥50% 的前 1–2 个",

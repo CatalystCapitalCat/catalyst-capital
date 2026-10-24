@@ -13,7 +13,21 @@ import os
 
 from . import geometry as G
 
-E = html.escape
+def E(v):
+    """转义任何值（数字、列表、None 也可以）。"""
+    if v is None:
+        return ""
+    if isinstance(v, (list, tuple)):
+        v = "、".join(str(x) for x in v)
+    return html.escape(str(v))
+
+
+def safe_url(u):
+    from urllib.parse import urlparse
+    try:
+        return u if urlparse(str(u)).scheme in ("http", "https") else None
+    except ValueError:
+        return None
 
 RATING = {"green": ("good", "▲", "好于基准"), "yellow": ("warn", "●", "持平"),
           "red": ("bad", "▼", "差于基准"), "grey": ("none", "○", "无对比基准")}
@@ -105,23 +119,31 @@ class MiniMap:
 
     @staticmethod
     def _zones():
-        # 区域划分边界（用于核对）：河道带、车道带、基地
+        """把 geometry.zone() 实际使用的边界画出来：基地多边形、河道带、上下半分界、车道带、坑、营地。"""
+        def P(u, v):
+            return "%.1f,%.1f" % (u * 512, (1 - v) * 512)
         out = []
+        # 基地：u ≤ 0.30、v ≤ 0.30、u+v ≤ 0.52（红方对称）
+        out.append('<polygon points="%s" class="zb"/>' % " ".join(P(u, v) for u, v in
+                   [(0, 0), (0.30, 0), (0.30, 0.22), (0.22, 0.30), (0, 0.30)]))
+        out.append('<polygon points="%s" class="zb"/>' % " ".join(P(1 - u, 1 - v) for u, v in
+                   [(0, 0), (0.30, 0), (0.30, 0.22), (0.22, 0.30), (0, 0.30)]))
         r = G.RIVER_HALF_WIDTH
         for off in (-r, r):
-            # u+v = 1+off 的直线
-            a, b = (0, 1 + off), (1 + off, 0)
             out.append('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" class="zl"/>' % (
-                a[0] * 512, (1 - a[1]) * 512, b[0] * 512, (1 - b[1]) * 512))
+                0, (1 - (1 + off)) * 512, (1 + off) * 512, 512))
         out.append('<line x1="0" y1="512" x2="512" y2="0" class="zl dim"/>')
         for name, lane in G.LANES.items():
-            pts = " ".join("%.1f,%.1f" % (u * 512, (1 - v) * 512) for u, v in lane)
+            pts = " ".join(P(u, v) for u, v in lane)
             out.append('<polyline points="%s" class="zlane" stroke-width="%.1f"/>' % (pts, 2 * G.LANE_HALF_WIDTH[name] * 512))
+        for code, (x, y) in G.PIT_CENTERS.items():
+            px, py = G.to_px(x, y)
+            out.append('<circle cx="%.1f" cy="%.1f" r="%.1f" class="zp"><title>%s</title></circle>' % (
+                px, py, G.PIT_RADIUS[code] * 512, E(G.ZONE_NAMES[code])))
         for team, name, x, y in G.CAMPS:
             px, py = G.to_px(x, y)
             out.append('<circle cx="%.1f" cy="%.1f" r="%.1f" class="zc"><title>%s%s</title></circle>' % (
                 px, py, G.CAMP_RADIUS * 512, {100: "蓝方", 200: "红方", 0: ""}[team], E(name)))
-        out.append('<path d="M0,%.1f A%.1f,%.1f 0 0 0 %.1f,512" class="zl"/>' % (512 - 0.30 * 512, 0.3 * 512, 0.3 * 512, 0.30 * 512))
         return "".join(out)
 
 
@@ -297,8 +319,9 @@ def _pool(S):
                      [[td(E(r["champ_zh"])), td(r["games"], "num"), td(pct(r["wr"]), "num"), td(num(r["net_wins"], 0, sign=True), "num"),
                        td(pct(r["smoothed_wr"]), "num"), td(E(r["calc"]), "calc")] for r in B["rows"]]))
     rec = B["recommend"]
-    out.append('<p class="verdict">按这个规则建议禁：%s</p>' % (
-        "、".join("<b>%s</b>" % E(r["champ_zh"]) for r in rec) if rec else "没有玩过 ≥3 场的英雄，按场次禁意义不大"))
+    out.append('<p class="verdict">按这个规则建议禁：%s%s%s</p>' % (
+        "、".join("<b>%s</b>" % E(r["champ_zh"]) for r in rec) if rec else "没有玩过 ≥3 场的英雄，按场次禁意义不大",
+        small_badge(B.get("small")), ('<span class="note">%s</span>' % E(B["fallback"])) if B.get("fallback") else ""))
     out.append(src_note(B["src"]))
     return "".join(out)
 
@@ -314,7 +337,7 @@ def _lane_jungle(S, mm):
                        for k in ("gold_diff_10", "xp_diff_10", "cs_diff_10", "gold_diff_15", "xp_diff_15", "cs_diff_15")]
                     + [td(pct(r["gold_diff_15"]["ahead_share"]), "num"),
                        cell(num(r["first_item"]["median"]) + " 分", r["first_item"]["rating"])])
-    out.append("<h2>和对位的差距（10 / 15 分钟）</h2>")
+    out.append("<h2>和对位的差距（10 / 15 分钟）%s</h2>" % small_badge(any(r["small"] for r in L["by_position"].values())))
     out.append('<p class="note">差值 = 他 − 对面同位置玩家，取第 10、15 分钟那一帧的累计金币（totalGold）、经验、补刀（小兵+野怪）。'
                '首件成装：第一件“成装”购买的时间（已扣掉撤销的购买），颜色与对位的首件成装时间比。</p>')
     out.append(table(["位置", "场次", "10 分经济差", "10 分经验差", "10 分补刀差", "15 分经济差", "15 分经验差", "15 分补刀差",
@@ -325,10 +348,13 @@ def _lane_jungle(S, mm):
             fi_items.append("%s：%s" % (POS_ZH.get(pos, pos), "、".join("%s %d 次" % kv for kv in r["first_item"]["items"].items())))
     if fi_items:
         out.append('<p class="note">首件成装：%s</p>' % E("；".join(fi_items)))
+    for pos, r in L["by_position"].items():
+        out.append('<p class="note">%s 首件成装对比：%s；对位中位数 %s 分钟。</p>' % (
+            E(POS_ZH.get(pos, pos)), E(r["first_item"]["note"]), num(r["first_item"]["opp_median"])))
     out.append(src_note(L["src"]))
 
     es = L["early_summary"]
-    out.append("<h2>前 10 分钟的击杀和死亡</h2>")
+    out.append("<h2>前 10 分钟的击杀和死亡%s</h2>" % small_badge(es["games"] < 10))
     out.append('<p class="verdict">%d 场里：击杀 %d、助攻 %d、死亡 %d（其中被抓 %d、单挑被杀 %d、被塔/兵处决 %d），场均死亡 %s。'
                '<span class="note">%s</span></p>' % (
                    es["games"], es["kills"], es["assists"], es["deaths"], es["ganked_deaths"], es["solo_deaths"],
@@ -400,26 +426,26 @@ def _jungle_section(J, mm):
                                                     (legend_sym("maybe", "tri"), "整分钟位置在线上、没有击杀（推测）")]))
     out.append("</div>")
 
-    out.append("<h2>第一次抓人%s</h2>" % inferred_badge())
+    out.append("<h2>第一次抓人%s%s</h2>" % (inferred_badge(), small_badge(J["small"])))
     out.append('<p class="verdict">中位时间 %s；去向 %s；有击杀/助攻的比例 %s。</p>' % (
-        mmss(J["first_gank_median"]), E("，".join("%s %d 场" % x for x in J["first_gank_lanes"])), pct(J["first_gank_success"])))
+        mmss(J["first_gank_median"]), E("，".join("%s %d 场" % tuple(x) for x in J["first_gank_lanes"])), pct(J["first_gank_success"])))
     out.append(table(["比赛 ID", "英雄", "阵营", "时间", "哪条线", "结果", "依据"],
                      [[td(E(f["match_id"]), "mono"), td(E(f["champ_zh"])), td(E(f["side"])), td(E(f["t"]), "num"),
                        td(E(f["lane"])), td(E(f["result"]) + (inferred_badge() if f["inferred"] else "")), td(E(f["basis"]), "calc")]
                       for f in J["first_gank"]], "dense"))
-    out.append("<h2>前 10 分钟去各条线</h2>")
+    out.append("<h2>前 10 分钟去各条线%s%s</h2>" % (inferred_badge(), small_badge(J["small"])))
     out.append(table(["线", "次数", "场均", "去过的场次", "其中有击杀/助攻", "其中有击杀事件为证", "第一次去（中位 / 最早）"],
                      [[td(E(l["lane_zh"])), td(l["visits_pre10"], "num"), td(num(l["per_game"], 2), "num"),
                        td("%d / %d" % (l["games_visited"], J["n"]), "num"), td(l["success"], "num"), td(l["direct_events"], "num"),
                        td("%s / %s" % (mmss(l["first_visit_median"]), mmss(l["first_visit_min"])), "num")] for l in J["lanes_pre10"]]))
     inv = J["invade"]
-    out.append("<h2>进对面野区%s</h2>" % inferred_badge())
+    out.append("<h2>进对面野区%s%s</h2>" % (inferred_badge(), small_badge(J["small"])))
     out.append('<p class="verdict">%d / %d 场在前 10 分钟有整分钟位置落在对面野区；场均 %s 个整分钟点（对面打野进他野区：场均 %s）。'
                '全场场均吃对面野怪 %s（对局详情 totalEnemyJungleMinionsKilled）；场均河蟹 %s。<span class="note">%s</span></p>' % (
                    inv["games_with_invade_pre10"], inv["n"], num(inv["avg_minutes_pre10"]), num(inv["opp_avg_minutes_pre10"]),
                    num(inv["avg_enemy_jg_cs_game"]), num(inv["avg_scuttle"]), E(inv["basis"])))
     O = J["objectives"]
-    out.append("<h2>野区资源</h2>")
+    out.append("<h2>野区资源%s</h2>" % small_badge(J["small"]))
     out.append(table(["资源", "他方拿 / 总数", "他方占比", "他方拿时他参与", "他方首次拿（中位）", "全场首次被拿（中位）", "他方拿到过的场次"],
                      [[td(E(o["label"])), td("%d / %d" % (o["his_team"], o["total"]), "num"), td(pct(o["his_team_share"]), "num"),
                        td(pct(o["him_involved_of_team"]), "num"), td(mmss(o["first_take_median_min"]), "num"),
@@ -428,9 +454,10 @@ def _jungle_section(J, mm):
                   for k, v in O["first_objective_of_his_team"])
     hp = J["half_preference"]
     sg = hp["signals"]
-    out.append('<p class="verdict">他方拿的第一个资源：%s。半区偏好（推测）：<b>%s</b>（3–14 分钟整分钟位置在上半区 %s，共 %d 个点；'
+    out.append('<p class="verdict">他方拿的第一个资源：%s。半区偏好%s：<b>%s</b>（3–14 分钟整分钟位置在上半区 %s，共 %d 个点；'
                '第一次抓人 上路 %d / 中路 %d / 下路 %d）。<span class="note">%s</span></p>' % (
-                   E(fo), E(hp["verdict"]), pct(sg["frames_top_share"]), sg["frames_n"], sg["first_gank_top"],
+                   E(fo), inferred_badge() + small_badge(hp.get("small")), E(hp["verdict"]), pct(sg["frames_top_share"]),
+                   sg["frames_n"], sg["first_gank_top"],
                    sg["first_gank_mid"], sg["first_gank_bot"], E(hp["basis"])))
     out.append(src_note(O["src"]))
     out.append("<h2>逐场开野记录%s</h2>" % inferred_badge())
@@ -490,7 +517,7 @@ def _deaths(S, mm):
                      [[td(E(r["feature"])), td(_fmt_feat(r["feature"], r["wins"]), "num"), td(_fmt_feat(r["feature"], r["losses"]), "num")]
                       for r in W["table"]]))
     out.append('<p class="verdict">输的类型：%s。<span class="note">%s</span></p>' % (
-        E("；".join("%s %d 场" % x for x in W["loss_type_count"]) or "无"), E(W["rule"])))
+        E("；".join("%s %d 场" % tuple(x) for x in W["loss_type_count"]) or "无"), E(W["rule"])))
     out.append(table(["比赛 ID", "他的英雄", "对位英雄", "时长", "15 分全队经济差", "前 10 分钟死亡（被抓）", "类型"],
                      [[td(E(t["match_id"]), "mono"), td(E(t["champ_zh"])), td(E(t["opp_champ_zh"] or "—")),
                        td(num(t["duration_min"], 0) + " 分", "num"), td(num(t["team_gold_diff_15"], 0, sign=True), "num"),
@@ -589,7 +616,8 @@ def _ref_section(S, notes):
             if n.get("category") != "champion" or subj in champs or n.get("champ_id") in champs:
                 rows.append([td(E(n.get("patch", ""))), td(E(subj)), td(E(n.get("direction_zh", n.get("direction", "")))),
                              td(E(n.get("change", ""))),
-                             td('<a href="%s" rel="noopener" target="_blank">%s</a>' % (E(n.get("source_url", "")), E(n.get("source_name", "来源"))))])
+                             td(('<a href="%s" rel="noopener" target="_blank">%s</a>' % (E(safe_url(n.get("source_url"))), E(n.get("source_name", "来源"))))
+                                if safe_url(n.get("source_url")) else E(n.get("source_url", "")))])
         out.append("<h2>最近两个版本的相关改动</h2>")
         out.append('<p class="note">%s</p>' % E(notes.get("note", "只列出他常用的英雄、我的英雄池和野区/资源相关的改动。")))
         out.append(table(["版本", "对象", "方向", "改动", "来源"], rows, "dense") if rows else "<p>这两个版本里没有相关改动。</p>")
@@ -771,6 +799,8 @@ g.pt.dead{stroke:none}
 .zl.dim{opacity:.45}
 .zlane{fill:none;stroke:#fff;opacity:.12;stroke-linecap:round;stroke-linejoin:round}
 .zc{fill:none;stroke:#ffe08a;stroke-width:1.2;opacity:.85}
+.zb{fill:none;stroke:#fff;stroke-width:1.6;opacity:.8}
+.zp{fill:none;stroke:#b8f0ff;stroke-width:1.4;stroke-dasharray:3 3;opacity:.9}
 .side{display:flex;flex-direction:column;gap:6px;min-width:0}
 dl.kv{display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;margin:6px 0;background:var(--surface);border:1px solid var(--line);
   border-radius:6px;padding:12px 14px}

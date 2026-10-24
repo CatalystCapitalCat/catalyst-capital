@@ -2,6 +2,7 @@
 
 只按需逐个读取原始 JSON，不把内容打印出来。"""
 
+import hashlib
 import json
 import os
 import zipfile
@@ -20,6 +21,8 @@ def safe_extract(zip_path, dest):
     with zipfile.ZipFile(zip_path) as zf:
         for info in zf.infolist():
             name = info.filename.replace("\\", "/")
+            if (info.external_attr >> 16) & 0o170000 == 0o120000:
+                raise DatasetError("zip 里有符号链接：%r" % info.filename)
             if name.startswith("/") or ".." in name.split("/"):
                 raise DatasetError("zip 里有不安全的路径：%r" % info.filename)
             target = os.path.abspath(os.path.join(dest_abs, *name.split("/")))
@@ -53,8 +56,9 @@ class Dataset:
         if not self.puuid:
             raise DatasetError("数据里没有 PUUID（account.json 缺失）")
         self.league = _load(self._p("league_entries.json")) if self.exists("league_entries.json") else None
-        self.match_ids = (_load(self._p("match_ids.json")) if self.exists("match_ids.json")
-                          else self.manifest.get("match_ids", []))
+        # manifest["match_ids"] 是实际处理的那一段（重开局会多取几场补足）；旧版只有 match_ids.json
+        self.match_ids = (self.manifest.get("match_ids")
+                          or (_load(self._p("match_ids.json")) if self.exists("match_ids.json") else []))
         self.ddragon_meta = _load(self._p("ddragon/meta.json")) if self.exists("ddragon/meta.json") else {}
         self.lane_opp_ranks = (_load(self._p("lane_opponent_ranks.json"))
                                if self.exists("lane_opponent_ranks.json") else {})
@@ -97,14 +101,31 @@ class Dataset:
         return None
 
 
+def _sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 def open_dataset(path, work_dir):
-    """path 可以是 zip 或目录。zip 会解压到 work_dir/raw（必须是新目录）。"""
+    """path 可以是 zip 或目录。zip 解压到 work_dir/raw_<zip 的 sha256 前 12 位>：
+    同一个 zip 重复分析会复用解压结果，换了 zip（比如续传后重新打包）一定会重新解压，不会用到旧数据。"""
     if os.path.isfile(path) and zipfile.is_zipfile(path):
-        dest = os.path.join(work_dir, "raw")
-        if os.path.isdir(dest) and os.listdir(dest):
+        digest = _sha256(path)
+        dest = os.path.join(work_dir, "raw_%s" % digest[:12])
+        marker = os.path.join(dest, ".source.json")
+        if os.path.exists(marker):
             root = find_root(dest)
         else:
-            root = find_root(safe_extract(path, dest))
+            if os.path.isdir(dest) and os.listdir(dest):
+                raise DatasetError("解压目录里有不完整的旧内容，请删除后重试：%s" % dest)
+            safe_extract(path, dest)
+            with open(marker, "w", encoding="utf-8") as fh:
+                json.dump({"zip": os.path.abspath(path), "sha256": digest}, fh)
+            root = find_root(dest)
+        print("数据：%s（sha256 %s…）→ %s" % (os.path.basename(path), digest[:12], root))
     elif os.path.isdir(path):
         root = find_root(path)
     else:

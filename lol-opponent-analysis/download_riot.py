@@ -52,6 +52,9 @@ PLATFORM_TO_REGION = {
     "oc1": "sea", "sg2": "sea", "tw2": "sea", "vn2": "sea", "ph2": "sea", "th2": "sea",
 }
 
+# account-v1 只在 americas / asia / europe 提供（东南亚服用 asia）
+ACCOUNT_REGION = {"americas": "americas", "asia": "asia", "europe": "europe", "sea": "asia"}
+
 DDRAGON_HOST = "ddragon.leagueoflegends.com"
 
 
@@ -158,7 +161,19 @@ class Client:
             try:
                 with self._open(url, host, riot) as resp:
                     body = resp.read()
-                return body if raw else json.loads(body.decode("utf-8"))
+                if raw:
+                    return body
+                try:
+                    return json.loads(body.decode("utf-8"))
+                except (ValueError, UnicodeDecodeError):
+                    # 例如被网络代理/登录页替换成了 HTML：按网络错误重试，最后作为这一项的失败记录
+                    if net_retries < 4:
+                        net_retries += 1
+                        self.log("  返回的不是 JSON，%d 秒后重试（第 %d/4 次）%s" % (2 ** net_retries, net_retries,
+                                                                           "（%s）" % label if label else ""))
+                        time.sleep(2 ** net_retries)
+                        continue
+                    raise HTTPFailure(0, "返回的内容不是合法 JSON")
             except urllib.error.HTTPError as e:
                 status = e.code
                 hdrs = e.headers or {}
@@ -260,7 +275,8 @@ def parse_args(argv=None):
     p.add_argument("--riot-id", default=DEFAULT_RIOT_ID, help="游戏名#Tag（默认：%(default)s）")
     p.add_argument("--platform", default=DEFAULT_PLATFORM,
                    help="服务器：auto（自动查，查不到用 euw1）、euw1、eun1、kr ……（默认 auto）")
-    p.add_argument("--count", type=int, default=20, help="下载最近多少场单双排（默认 20，最多 100）")
+    p.add_argument("--count", type=int, default=20,
+                   help="下载最近多少场有效单双排（默认 20，最多 95；重开局不算，会自动多取几场补足）")
     p.add_argument("--out", default=None, help="输出目录（默认 ./lol_data_<时间>）")
     p.add_argument("--no-opponent-ranks", action="store_true",
                    help="不查每场对面同位置玩家的当前段位（默认会查，约多 20 次请求）")
@@ -293,6 +309,20 @@ def patch_of(game_version):
     return "%s.%s" % (m.group(1), m.group(2)) if m else None
 
 
+def clean_key(raw):
+    """去掉首尾空格和引号（cmd 的 set 会把引号也存进去）；只接受可打印 ASCII、无空格的密钥。不回显密钥。"""
+    k = (raw or "").strip().strip('"').strip("'").strip()
+    if not k or not re.fullmatch(r"[\x21-\x7e]+", k):
+        return None
+    return k
+
+
+def is_remake(match):
+    info = (match or {}).get("info") or {}
+    dur = info.get("gameDuration") or 0
+    return any(p.get("gameEndedInEarlySurrender") for p in info.get("participants") or []) or (0 < dur < 300)
+
+
 def main(argv=None):
     args = parse_args(argv)
     if hasattr(sys.stdout, "reconfigure"):
@@ -301,19 +331,23 @@ def main(argv=None):
         except Exception:
             pass
 
-    api_key = os.environ.get("RIOT_API_KEY", "").strip()
-    if not api_key:
+    raw_key = os.environ.get("RIOT_API_KEY", "")
+    if not raw_key.strip():
         print("没有找到环境变量 RIOT_API_KEY。\n"
               "  Windows PowerShell： $env:RIOT_API_KEY=\"你的密钥\"\n"
               "  Windows cmd：        set RIOT_API_KEY=你的密钥\n"
               "  macOS / Linux：      export RIOT_API_KEY=你的密钥\n"
               "密钥在 https://developer.riotgames.com 登录后获取（开发者密钥 24 小时过期）。")
         return 2
+    api_key = clean_key(raw_key)
+    if not api_key:
+        print("环境变量 RIOT_API_KEY 的格式不对（含空格、换行或非英文字符）。请重新复制 RGAPI- 开头的密钥再设置一次。")
+        return 2
 
     game_name, tag_line = split_riot_id(args.riot_id)
-    count = max(1, min(100, args.count))
+    count = max(1, min(95, args.count))
     started = utc_now()
-    out = args.out or os.path.abspath("lol_data_%s" % started.strftime("%Y%m%d_%H%M%S"))
+    out = os.path.abspath(args.out or "lol_data_%s" % started.strftime("%Y%m%d_%H%M%S"))
     os.makedirs(out, exist_ok=True)
 
     manifest_path = os.path.join(out, "manifest.json")
@@ -339,6 +373,7 @@ def main(argv=None):
             "notes": [
                 "API 密钥只从环境变量读取，没有写入任何文件。",
                 "所有时间为 UTC。段位是下载当时的段位，不是对局当时的段位。",
+                "重开局（提前投降/不足 5 分钟）不计入 %d 场，会多取几场补足；重开局不下载时间线。" % count,
             ],
         }
     store = Store(out, manifest)
@@ -350,15 +385,28 @@ def main(argv=None):
                                      "at_utc": iso(utc_now())})
         log("  ✗ %s %s 失败：%s（已跳过并记录）" % (what, match_id or "", err))
 
+    def optional(what, fn):
+        """可选步骤：任何错误（包括 401/403）都只记录，不中止。"""
+        try:
+            return fn()
+        except (HTTPFailure, FatalAPIError) as e:
+            fail(what, None, e)
+        except Exception as e:  # 响应格式异常等
+            fail(what, None, "%s: %s" % (type(e).__name__, e))
+        return None
+
     fatal = None
+    interrupted = False
     patches = set()
+    processed = []
+    ranks = {}
     try:
         # ---------- 1. account-v1 ----------
         platform = args.platform.lower()
-        region = PLATFORM_TO_REGION.get(platform, "europe") if platform != "auto" else "europe"
-        log("查询账号 %s#%s（account-v1，%s）" % (game_name, tag_line, region))
+        acc_region = ACCOUNT_REGION.get(PLATFORM_TO_REGION.get(platform, "europe"), "europe") if platform != "auto" else "europe"
+        log("查询账号 %s#%s（account-v1，%s）" % (game_name, tag_line, acc_region))
         try:
-            account = client.get("%s.api.riotgames.com" % region,
+            account = client.get("%s.api.riotgames.com" % acc_region,
                                  "/riot/account/v1/accounts/by-riot-id/%s/%s" % (q(game_name), q(tag_line)),
                                  label="account")
         except HTTPFailure as e:
@@ -374,16 +422,16 @@ def main(argv=None):
         if platform == "auto":
             platform_source = "默认值（欧服西部 euw1）"
             platform = FALLBACK_PLATFORM
-            try:
-                reg = client.get("%s.api.riotgames.com" % region,
-                                 "/riot/account/v1/region/by-game/lol/by-puuid/%s" % q(puuid), label="region")
-                store.write("account_region.json", reg,
-                            "account-v1 /riot/account/v1/region/by-game/lol/by-puuid/{puuid}")
-                if reg.get("region") and reg["region"].lower() in PLATFORM_TO_REGION:
+            reg = optional("region", lambda: client.get(
+                "%s.api.riotgames.com" % acc_region,
+                "/riot/account/v1/region/by-game/lol/by-puuid/%s" % q(puuid), label="region"))
+            if isinstance(reg, dict):
+                store.write("account_region.json", reg, "account-v1 /riot/account/v1/region/by-game/lol/by-puuid/{puuid}")
+                if str(reg.get("region", "")).lower() in PLATFORM_TO_REGION:
                     platform = reg["region"].lower()
                     platform_source = "account-v1 region/by-game/lol 接口"
-            except HTTPFailure as e:
-                log("  查不到所在服务器（%s），按欧服西部 euw1 处理" % e)
+            else:
+                log("  查不到所在服务器，按欧服西部 euw1 处理")
         else:
             platform_source = "命令行参数 --platform"
         region = PLATFORM_TO_REGION.get(platform, "europe")
@@ -391,11 +439,11 @@ def main(argv=None):
         log("  服务器：%s（来源：%s），对局路由：%s" % (platform, platform_source, region))
         store.save_manifest()
 
-        # ---------- 2. league-v4 ----------
+        # ---------- 2. league-v4（可选） ----------
         log("查询当前段位（league-v4）")
-        try:
-            entries = client.get("%s.api.riotgames.com" % platform,
-                                 "/lol/league/v4/entries/by-puuid/%s" % q(puuid), label="league")
+        entries = optional("league", lambda: client.get("%s.api.riotgames.com" % platform,
+                                                        "/lol/league/v4/entries/by-puuid/%s" % q(puuid), label="league"))
+        if isinstance(entries, list):
             store.write("league_entries.json", entries, "league-v4 /lol/league/v4/entries/by-puuid/{puuid}")
             solo = [x for x in entries if x.get("queueType") == "RANKED_SOLO_5x5"]
             if solo:
@@ -404,107 +452,99 @@ def main(argv=None):
                                                      s.get("wins"), s.get("losses")))
             else:
                 log("  本赛季没有单双排段位记录（可能未定级）")
-        except HTTPFailure as e:
-            fail("league", None, e)
 
-        # ---------- 3. match-v5 ids ----------
-        log("获取最近 %d 场单双排的比赛 ID（match-v5）" % count)
+        # ---------- 3. match-v5 ids（多取几场，用来补重开局） ----------
+        fetch_n = min(100, count + 5)
+        log("获取最近的单双排比赛 ID（match-v5，取 %d 个，用前 %d 场有效对局）" % (fetch_n, count))
         ids = client.get("%s.api.riotgames.com" % region,
                          "/lol/match/v5/matches/by-puuid/%s/ids" % q(puuid),
-                         query={"queue": RANKED_SOLO_QUEUE, "start": 0, "count": count}, label="match ids")
-        store.write("match_ids.json", ids, "match-v5 /lol/match/v5/matches/by-puuid/{puuid}/ids?queue=420&start=0&count=%d" % count)
-        manifest["match_ids"] = ids
-        log("  共 %d 场" % len(ids))
+                         query={"queue": RANKED_SOLO_QUEUE, "start": 0, "count": fetch_n}, label="match ids")
+        if not isinstance(ids, list):
+            raise HTTPFailure(0, "比赛 ID 列表格式不对")
+        store.write("match_ids.json", ids,
+                    "match-v5 /lol/match/v5/matches/by-puuid/{puuid}/ids?queue=420&start=0&count=%d" % fetch_n)
+        log("  共 %d 个" % len(ids))
         store.save_manifest()
 
         # ---------- 4. 每场对局 + 时间线 ----------
         lane_opponents = {}
-        for i, mid in enumerate(ids, 1):
-            rec = manifest["matches"].setdefault(mid, {})
-            rel_m, rel_t = "matches/%s.json" % mid, "timelines/%s.json" % mid
-            log("[%d/%d] %s" % (i, len(ids), mid))
-            match = None
-            cached = store.existing(rel_m)
-            if cached:
-                rec.update({"match": "ok", "match_downloaded_at_utc": cached})
-                with open(os.path.join(out, "matches", mid + ".json"), encoding="utf-8") as fh:
-                    match = json.load(fh)
-                log("  对局详情已存在，跳过")
-            else:
-                try:
-                    match = client.get("%s.api.riotgames.com" % region, "/lol/match/v5/matches/%s" % q(mid),
-                                       label=mid)
-                    rec["match"] = "ok"
-                    rec["match_downloaded_at_utc"] = store.write(rel_m, match, "match-v5 /lol/match/v5/matches/{matchId}")
-                except HTTPFailure as e:
-                    rec["match"] = "failed"
-                    rec["error"] = str(e)
-                    fail("match", mid, e)
-            cached = store.existing(rel_t)
-            if cached:
-                rec.update({"timeline": "ok", "timeline_downloaded_at_utc": cached})
-                log("  时间线已存在，跳过")
-            else:
-                try:
-                    tl = client.get("%s.api.riotgames.com" % region, "/lol/match/v5/matches/%s/timeline" % q(mid),
-                                    label=mid + " timeline")
-                    rec["timeline"] = "ok"
-                    rec["timeline_downloaded_at_utc"] = store.write(
-                        rel_t, tl, "match-v5 /lol/match/v5/matches/{matchId}/timeline")
-                    del tl
-                except HTTPFailure as e:
-                    rec["timeline"] = "failed"
-                    rec["error"] = (rec.get("error", "") + " | timeline: " + str(e)).strip(" |")
-                    fail("timeline", mid, e)
-            if match:
-                info = match.get("info", {})
-                p = patch_of(info.get("gameVersion"))
-                if p:
-                    patches.add(p)
-                me = next((x for x in info.get("participants", []) if x.get("puuid") == puuid), None)
-                if me and me.get("teamPosition"):
-                    opp = next((x for x in info["participants"] if x.get("teamId") != me.get("teamId")
-                                and x.get("teamPosition") == me.get("teamPosition")), None)
-                    if opp:
-                        lane_opponents[opp["puuid"]] = mid
+        valid = 0
+        for mid in ids:
+            if valid >= count:
+                break
+            processed.append(mid)
+            manifest["match_ids"] = processed
+            try:
+                match = _download_one(client, store, manifest, log, fail, region, out, mid, len(processed))
+            except FatalAPIError:
+                raise
+            except Exception as e:  # 单场的任何意外都只跳过这一场
+                fail("match", mid, "%s: %s" % (type(e).__name__, e))
+                match = None
+            rec = manifest["matches"].get(mid, {})
+            if match is None:
+                valid += 1  # 下载失败的也占一个名额（"最近 N 场"），不往后补
+                continue
+            if rec.get("remake"):
+                continue  # 重开局不占名额
+            valid += 1
+            info = match.get("info", {})
+            p = patch_of(info.get("gameVersion"))
+            if p:
+                patches.add(p)
+            me = next((x for x in info.get("participants", []) if x.get("puuid") == puuid), None)
+            if me and me.get("teamPosition"):
+                opp = next((x for x in info["participants"] if x.get("teamId") != me.get("teamId")
+                            and x.get("teamPosition") == me.get("teamPosition")), None)
+                if opp and opp.get("puuid"):
+                    lane_opponents[opp["puuid"]] = mid
             store.save_manifest()
 
-        # ---------- 5. 对面同位置玩家的当前段位 ----------
+        # ---------- 5. 对面同位置玩家的当前段位（可选） ----------
         if not args.no_opponent_ranks and lane_opponents:
             log("查询每场对面同位置玩家的当前段位（league-v4，%d 人）" % len(lane_opponents))
-            ranks = {}
             for opp_puuid, mid in lane_opponents.items():
-                try:
-                    ent = client.get("%s.api.riotgames.com" % platform,
-                                     "/lol/league/v4/entries/by-puuid/%s" % q(opp_puuid), label="rank " + mid)
+                ent = optional("lane_opponent_rank", lambda: client.get(
+                    "%s.api.riotgames.com" % platform, "/lol/league/v4/entries/by-puuid/%s" % q(opp_puuid),
+                    label="rank " + mid))
+                if isinstance(ent, list):
                     ranks[opp_puuid] = {"fetched_at_utc": iso(utc_now()), "match_id": mid, "entries": ent}
-                except HTTPFailure as e:
-                    fail("lane_opponent_rank", mid, e)
-            store.write("lane_opponent_ranks.json", ranks, "league-v4 /lol/league/v4/entries/by-puuid/{puuid}（对面同位置玩家）")
 
     except (FatalAPIError, HTTPFailure) as e:
         fatal = str(e)
         log("✗ 停止：%s" % fatal)
         manifest["failures"].append({"what": "fatal", "match_id": None, "error": fatal, "at_utc": iso(utc_now())})
+    except KeyboardInterrupt:
+        interrupted = True
+        log("✗ 已中断。已下载的文件保留，用 --out 指向同一目录重新运行可以继续。")
+    finally:
+        if ranks:
+            store.write("lane_opponent_ranks.json", ranks, "league-v4 /lol/league/v4/entries/by-puuid/{puuid}（对面同位置玩家）")
+        store.save_manifest()
 
     # ---------- 6. Data Dragon（不需要密钥） ----------
-    try:
-        download_ddragon(client, store, manifest, log, sorted(patches) if fatal is None else [])
-    except Exception as e:  # Data Dragon 失败不影响对局数据
-        fail("ddragon", None, e)
+    if not interrupted:
+        try:
+            download_ddragon(client, store, manifest, log, sorted(patches))
+        except Exception as e:  # Data Dragon 失败不影响对局数据
+            fail("ddragon", None, e)
 
     finished = utc_now()
     manifest["finished_at_utc"] = iso(finished)
-    ok_m = sum(1 for r in manifest["matches"].values() if r.get("match") == "ok")
-    ok_t = sum(1 for r in manifest["matches"].values() if r.get("timeline") == "ok")
-    manifest["summary"] = {"matches_ok": ok_m, "timelines_ok": ok_t,
-                           "failures": len(manifest["failures"]), "requests": client.request_count}
+    cur = [manifest["matches"].get(m, {}) for m in processed]
+    ok_m = sum(1 for r in cur if r.get("match") == "ok")
+    ok_t = sum(1 for r in cur if r.get("timeline") == "ok")
+    remakes = sum(1 for r in cur if r.get("remake"))
+    stale = [m for m in manifest["matches"] if m not in processed]
+    manifest["summary"] = {"matches_processed": len(processed), "matches_ok": ok_m, "timelines_ok": ok_t,
+                           "remakes": remakes, "failures": len(manifest["failures"]),
+                           "requests": client.request_count, "stale_entries_from_earlier_runs": stale}
     store.save_manifest()
-    log("完成：对局详情 %d 场，时间线 %d 场，失败 %d 项，用时 %.0f 秒" %
-        (ok_m, ok_t, len(manifest["failures"]), (finished - started).total_seconds()))
+    log("完成：对局详情 %d 场（其中重开局 %d 场），时间线 %d 场，失败 %d 项，用时 %.0f 秒" %
+        (ok_m, remakes, ok_t, len(manifest["failures"]), (finished - started).total_seconds()))
     log.close()
 
-    if not args.no_zip:
+    if not args.no_zip and not interrupted:
         zpath = out.rstrip("/\\") + ".zip"
         with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as zf:
             for root, _, files in os.walk(out):
@@ -515,7 +555,57 @@ def main(argv=None):
                     zf.write(full, os.path.relpath(full, os.path.dirname(out)))
         print("已打包：%s（%.1f MB）" % (zpath, os.path.getsize(zpath) / 1e6))
         print("把这个 zip 文件发回来即可。")
-    return 1 if fatal else 0
+    return 1 if (fatal or interrupted) else 0
+
+
+def _download_one(client, store, manifest, log, fail, region, out, mid, n):
+    """下载一场的详情和时间线；失败只记录。返回对局详情（失败返回 None）。"""
+    rec = manifest["matches"].setdefault(mid, {})
+    rel_m, rel_t = "matches/%s.json" % mid, "timelines/%s.json" % mid
+    log("[%d] %s" % (n, mid))
+    match = None
+    cached = store.existing(rel_m)
+    if cached:
+        rec.update({"match": "ok", "match_downloaded_at_utc": cached})
+        with open(os.path.join(out, "matches", mid + ".json"), encoding="utf-8") as fh:
+            match = json.load(fh)
+        log("  对局详情已存在，跳过")
+    else:
+        try:
+            match = client.get("%s.api.riotgames.com" % region, "/lol/match/v5/matches/%s" % q(mid), label=mid)
+            if not isinstance(match, dict) or "info" not in match:
+                raise HTTPFailure(0, "对局详情格式不对（没有 info）")
+            rec["match"] = "ok"
+            rec.pop("match_error", None)
+            rec["match_downloaded_at_utc"] = store.write(rel_m, match, "match-v5 /lol/match/v5/matches/{matchId}")
+        except HTTPFailure as e:
+            rec["match"] = "failed"
+            rec["match_error"] = str(e)
+            fail("match", mid, e)
+            return None
+    rec["remake"] = bool(is_remake(match))
+    if rec["remake"]:
+        rec["timeline"] = "skipped"
+        log("  重开局：不计入场数，不下载时间线")
+        return match
+    cached = store.existing(rel_t)
+    if cached:
+        rec.update({"timeline": "ok", "timeline_downloaded_at_utc": cached})
+        log("  时间线已存在，跳过")
+    else:
+        try:
+            tl = client.get("%s.api.riotgames.com" % region, "/lol/match/v5/matches/%s/timeline" % q(mid),
+                            label=mid + " timeline")
+            if not isinstance(tl, dict) or "info" not in tl:
+                raise HTTPFailure(0, "时间线格式不对（没有 info）")
+            rec["timeline"] = "ok"
+            rec.pop("timeline_error", None)
+            rec["timeline_downloaded_at_utc"] = store.write(rel_t, tl, "match-v5 /lol/match/v5/matches/{matchId}/timeline")
+        except HTTPFailure as e:
+            rec["timeline"] = "failed"
+            rec["timeline_error"] = str(e)
+            fail("timeline", mid, e)
+    return match
 
 
 def download_ddragon(client, store, manifest, log, match_patches):
