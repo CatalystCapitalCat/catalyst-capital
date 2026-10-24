@@ -44,7 +44,8 @@ def ds_meta(ds):
         "platform": m.get("platform"), "platform_source": m.get("platform_source"),
         "started_at_utc": m.get("started_at_utc"), "finished_at_utc": m.get("finished_at_utc"),
         "downloaded_date": fin[:10] or "?", "ddragon_latest": (ds.ddragon_meta or {}).get("latest_version"),
-        "failures": m.get("failures", []), "synthetic": bool(m.get("synthetic")),
+        "failures": m.get("failures", []),
+        "synthetic": bool(m.get("synthetic") or ds.account.get("_synthetic_test_data")),
         "rank": solo, "lane_opp_ranks": ds.lane_opp_ranks, "item_rule": COMPLETED_RULE,
         "league_downloaded_at_utc": ds.file_meta("league_entries.json").get("downloaded_at_utc"),
     }

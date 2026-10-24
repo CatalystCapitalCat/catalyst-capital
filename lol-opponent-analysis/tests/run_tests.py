@@ -101,7 +101,7 @@ def main():
             assert meta.get("downloaded_at_utc") and meta.get("sha256"), rel
         print("下载测试通过：%d 个文件，失败 %d 项（含注入的 503/404）" % (len(names), len(man["failures"])))
 
-        r0 = run([sys.executable, "-I", os.path.join(ROOT, "download_riot.py"), "--riot-id", "原州市的努力的天才超级打野李承勇#VALOR",
+        r0 = run([sys.executable, "-I", os.path.join(ROOT, "download_riot.py"), "--riot-id", "测试用中文名字打野#CN1",
                   "--count", "1", "--no-zip", "--no-opponent-ranks", "--out", os.path.join(work, "dl", "cn_name"),
                   "--api-base", "http://127.0.0.1:%d" % port, "--ddragon-base", "http://127.0.0.1:%d" % port], env=env, check=False)
         assert r0.returncode == 0 and "找到账号" in r0.stdout, r0.stdout[-1500:]
@@ -114,7 +114,8 @@ def main():
         assert "已存在，跳过" in r2.stdout
         print("续传测试通过")
         # 过期密钥 → 停止并给出清楚的提示
-        r3 = run([sys.executable, "-I", os.path.join(ROOT, "download_riot.py"), "--out", os.path.join(work, "dl", "expired"),
+        r3 = run([sys.executable, "-I", os.path.join(ROOT, "download_riot.py"), "--riot-id", "TestJungler#TEST",
+                  "--out", os.path.join(work, "dl", "expired"),
                   "--no-zip", "--api-base", "http://127.0.0.1:%d" % port, "--ddragon-base", "http://127.0.0.1:%d" % port],
                  env=dict(os.environ, RIOT_API_KEY="EXPIRED"), check=False)
         assert r3.returncode != 0 and "密钥" in r3.stdout, r3.stdout[-1500:]

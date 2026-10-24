@@ -53,7 +53,7 @@ import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-DEFAULT_ALIASES = ["原州市的努力的天才超级打野李承勇#VALOR"]
+DEFAULT_ALIASES = ["测试用中文名字打野#CN1"]
 QUEUE_RANKED_SOLO = 420
 TIERS = ["IRON", "BRONZE", "SILVER", "GOLD", "PLATINUM", "EMERALD", "DIAMOND", "MASTER"]
 
@@ -102,14 +102,16 @@ class Fixture(object):
             self._add_account(n, t, puuid)
 
     def _add_account(self, name, tag, puuid):
-        self.accounts[(name.casefold(), tag.casefold())] = {"puuid": puuid, "gameName": name, "tagLine": tag}
+        # _synthetic_test_data：真实接口不会有这个字段；分析脚本看到它就在报告顶部标“测试用合成数据”
+        self.accounts[(name.casefold(), tag.casefold())] = {"puuid": puuid, "gameName": name, "tagLine": tag,
+                                                            "_synthetic_test_data": True}
 
     def known(self, puuid):
         return puuid == self.target or puuid in self.by_puuid
 
     def account_by_puuid(self, puuid):
         if puuid == self.target:
-            return dict(self.account)
+            return dict(self.account, _synthetic_test_data=True)
         if puuid in self.names:
             n, t = self.names[puuid]
             return {"puuid": puuid, "gameName": n, "tagLine": t}

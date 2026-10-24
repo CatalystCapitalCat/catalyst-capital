@@ -961,6 +961,8 @@ def _f(x, d=1):
 def print_summary(S, log=print):
     m = S["meta"]
     log("=" * 60)
+    if m.get("synthetic"):
+        log("!! 测试用合成数据，不是真实对局，不能用来做判断")
     log("%s | 纳入 %d/%d 场（有时间线 %d）| 版本 %s | 下载 %s%s" % (
         m.get("riot_id"), m["n_included"], m["n_ids"], m["n_timeline"], "/".join(m["patches"]), m.get("downloaded_date"),
         "（样本太少）" if m["n_included"] < SMALL_N else ""))
