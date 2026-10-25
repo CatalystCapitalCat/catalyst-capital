@@ -47,6 +47,9 @@ LANES = {
 LANE_HALF_WIDTH = {"TOP": 0.055, "MID": 0.050, "BOT": 0.055}
 RIVER_HALF_WIDTH = 0.085          # |u+v-1| ≤ 此值 → 河道
 GANK_RIVER_LANE_DIST = 0.13       # 河道里离某条线中心线这么近 → 算作去这条线（河道口）
+# 上路/下路拐角（线和河道交汇的河道口）整块算作线上：2026 年真实对局里上单/下路对线期常站在这里，
+# 只用车道折线会把它们划进河道（核对图上看到的问题）
+LANE_CORNER = 0.22
 
 # 野怪营地（游戏坐标，取自游戏数据的刷新点；不同来源相差最多约 240 码）。team = 营地属于哪一方的野区。
 CAMPS = [
@@ -67,7 +70,7 @@ PIT_RADIUS = {"BARON_PIT": 0.065, "DRAGON_PIT": 0.055}
 # 区域代码（与队伍无关）
 ZONE_NAMES = {
     "BASE_BLUE": "蓝方基地", "BASE_RED": "红方基地",
-    "TOP": "上路", "MID": "中路", "BOT": "下路",
+    "TOP": "上路（含河道口）", "MID": "中路", "BOT": "下路（含河道口）",
     "RIVER_TOP": "上半河道", "RIVER_BOT": "下半河道",
     "BARON_PIT": "大龙/先锋/虚空巢虫坑", "DRAGON_PIT": "小龙坑",
     "JG_BLUE_TOP": "蓝方上半野区", "JG_BLUE_BOT": "蓝方下半野区",
@@ -96,6 +99,10 @@ def zone(x, y):
         pu, pv = norm(px, py)
         if math.hypot(u - pu, v - pv) <= PIT_RADIUS[code]:
             return code
+    if u <= LANE_CORNER and v >= 1 - LANE_CORNER:
+        return "TOP"
+    if u >= 1 - LANE_CORNER and v <= LANE_CORNER:
+        return "BOT"
     camp = _nearest_camp_norm(u, v)
     in_camp = camp[0] <= CAMP_RADIUS and camp[1] != 0
     if not in_camp:

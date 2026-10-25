@@ -133,7 +133,7 @@ def compute(out_dir, ds_meta, log=print):
     S["lane"] = _lane(games, tl_games, kills, src)
     jg = [g for g in tl_games if g["position"] == "JUNGLE"]
     S["jungle"] = _jungle(jg, frames, kills, objs, src) if jg else None
-    S["deaths"] = _deaths(tl_games, kills, src)
+    S["deaths"] = _deaths(tl_games, kills, src, main_pos)
     S["weakness"] = _weakness(games, tl_games, kills, frames, parts, src)
     S["ban"] = _ban(S["champ_pool"], src)
     S["lobby_ranks"] = _lobby_ranks(ds_meta, main_games, src)
@@ -525,7 +525,7 @@ def _jungle(jg, frames, kills, objs, src):
         "basis": ("开野：第 1 分钟（1:00，野怪 0:55 刷新）位置所在半区 = 开局方向（1:00 在基地/河道时改用 2:00）；"
                   "最近营地距离 < %.0f 码时标注营地名；第 3 分钟位置 = 去向；补刀按每组约 %.0f 个估算组数。"
                   "抓人：时间线击杀事件（他是击杀/助攻/阵亡者）在线上或河道口 = 直接数据；"
-                  "第 2–14 分钟整分钟位置在线上或河道口 = 推测（每分钟只记一次位置）。"
+                  "第 3–13 分钟整分钟位置在线上或河道口 = 推测（每分钟只记一次位置；2:00 的位置多是清野途中穿过中路，不算）。"
                   % (G.CAMP_RADIUS * 1.6 * (G.X_MAX - G.X_MIN), CS_PER_CAMP)),
     }
 
@@ -605,7 +605,8 @@ def _opening(g, fr):
 def _gank_episodes(g, fr, ks):
     """他每次去线上的经历。
     直接数据：击杀事件（他是击杀/助攻/阵亡者）发生在线上或河道口；同一路 60 秒内的多个事件算一次。
-    推测：第 2–13 分钟整分钟位置在线上/河道口。同一路连续几分钟算一次"去线上"，
+    推测：第 3–13 分钟整分钟位置在线上/河道口（2:00 的位置不算：真实数据里 2:00 常见打野清完一边、
+    穿过中路去另一边，属于路过）。同一路连续几分钟算一次"去线上"，
     这段时间前后 1 分钟内有同一路的击杀事件就并到那次事件里，没有才记为"没有击杀"。"""
     team = g["team_id"]
     evs = []
@@ -637,7 +638,7 @@ def _gank_episodes(g, fr, ks):
         merged.append(e)
     # 整分钟位置：同一路连续的分钟合成一段
     runs = []
-    for m in range(2, 14):
+    for m in range(3, 14):
         f = fr.get(m)
         lane = G.gank_lane(f["x"], f["y"]) if f and f["x"] is not None else None
         if lane and runs and runs[-1]["lane"] == lane and runs[-1]["m_b"] == m - 1:
@@ -778,7 +779,8 @@ def _half_pref(jg, fr_by, first, objectives):
 
 
 # ---------------------------------------------------------------- 死亡分布
-def _deaths(tl_games, kills, src):
+def _deaths(tl_games, kills, src, main_pos=None):
+    """死亡分布。前 10 分钟的热点只看主要位置的对局（打野和打上单死的地方不能混在一起），其它位置单列。"""
     inc = {g["match_id"]: g for g in tl_games}
     rows = []
     for k in kills:
@@ -787,17 +789,26 @@ def _deaths(tl_games, kills, src):
             rows.append({"match_id": k["match_id"], "t_min": k["t_min"], "t": mmss(k["t_min"]), "x": k["x"], "y": k["y"],
                          "zone": G.rel_zone(k["zone"], g["team_id"]), "n_attackers": k["n_attackers"],
                          "executed": k["executed"], "killer": k["killer_champ"], "champ_zh": g["champ_zh"],
-                         "side": g["side"], "win": g["win"]})
-    early = [r for r in rows if r["t_min"] < 10]
+                         "side": g["side"], "win": g["win"], "position": g["position"]})
+    main_games = [g for g in tl_games if g["position"] == main_pos] if main_pos else tl_games
+    main_rows = [r for r in rows if r["position"] == main_pos] if main_pos else rows
+    early = [r for r in main_rows if r["t_min"] < 10]
     bins = [("0:00–1:59", 0, 2), ("2:00–3:59", 2, 4), ("4:00–5:59", 4, 6), ("6:00–7:59", 6, 8), ("8:00–9:59", 8, 10)]
     tb = [{"bin": b, "deaths": sum(1 for r in early if lo <= r["t_min"] < hi)} for b, lo, hi in bins]
     zc = Counter(r["zone"] for r in early).most_common()
-    allz = Counter(r["zone"] for r in rows).most_common()
-    return {"rows": rows, "n_games": len(tl_games), "total": len(rows), "early_total": len(early),
+    allz = Counter(r["zone"] for r in main_rows).most_common()
+    other = {}
+    for r in rows:
+        if main_pos and r["position"] != main_pos and r["t_min"] < 10:
+            other.setdefault(r["position"], Counter())[r["zone"]] += 1
+    return {"rows": rows, "n_games": len(tl_games), "total": len(rows), "main_position": main_pos,
+            "n_main_games": len(main_games), "main_total": len(main_rows), "early_total": len(early),
+            "early_ganked": sum(1 for r in early if (r["n_attackers"] or 0) >= 2),
             "early_zone_counts": zc, "all_zone_counts": allz, "early_time_bins": tb,
             "early_top_zone": zc[0] if zc else None,
             "early_top_bin": _top_bin(tb) if early else None,
-            "src": src(tl_games, "match-v5 时间线 CHAMPION_KILL 事件（他是受害者）")}
+            "other_positions_early": {p: c.most_common() for p, c in other.items()},
+            "src": src(main_games, "match-v5 时间线 CHAMPION_KILL 事件（他是受害者）")}
 
 
 def _top_bin(tb):
@@ -1008,8 +1019,9 @@ def print_summary(S, log=print):
                                                          mmss(o["first_take_median_min"])))
         log("-- 半区偏好（推测）：%s" % J["half_preference"]["verdict"])
     D = S["deaths"]
-    log("-- 死亡：共 %d 次，前 10 分钟 %d 次；最多的区域 %s；时间段 %s" % (
-        D["total"], D["early_total"], D["early_top_zone"], D["early_top_bin"]))
+    log("-- 死亡（%s 局 %d 场）：共 %d 次，前 10 分钟 %d 次（被抓 %d）；最多的区域 %s；时间段 %s；其它位置前 10 分钟：%s" % (
+        D["main_position"], D["n_main_games"], D["main_total"], D["early_total"], D["early_ganked"], D["early_top_zone"],
+        D["early_top_bin"], D["other_positions_early"]))
     Wk = S["weakness"]
     log("-- 输的类型（%d 负）：" % Wk["n_losses"] + "；".join("%s %d" % x for x in Wk["loss_type_count"]))
     log("-- 建议禁用：" + "；".join("%s（%s）" % (b["champ_zh"], b["calc"]) for b in S["ban"]["recommend"]))

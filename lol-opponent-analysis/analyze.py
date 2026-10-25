@@ -122,6 +122,27 @@ def cmd_calibrate(args, quiet=False):
     return calib
 
 
+def cmd_rezone(args):
+    """区域划分改了以后，只根据 CSV 里的坐标重算 zone 列（不重新解析原始 JSON）。"""
+    import csv
+    for name in ("frames.csv", "kills.csv"):
+        path = os.path.join(args.out, "csv", name)
+        with open(path, encoding="utf-8-sig", newline="") as fh:
+            rd = csv.DictReader(fh)
+            fields, rows = rd.fieldnames, list(rd)
+        changed = 0
+        for r in rows:
+            if r["x"] not in ("", None) and r["y"] not in ("", None):
+                z = G.zone(float(r["x"]), float(r["y"]))
+                changed += z != r["zone"]
+                r["zone"] = z
+        with open(path, "w", encoding="utf-8-sig", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=fields)
+            w.writeheader()
+            w.writerows(rows)
+        print("%s：%d 行，重算后变化 %d 行" % (name, len(rows), changed))
+
+
 def cmd_report(args):
     with open(os.path.join(args.out, "summary.json"), encoding="utf-8") as fh:
         S = json.load(fh)
@@ -156,7 +177,7 @@ def main(argv=None):
         p.add_argument("--strategy", default=None)
         p.add_argument("--patch-notes", default=DEFAULT_PATCH_NOTES if os.path.exists(DEFAULT_PATCH_NOTES) else None, help="版本公告摘录（JSON，见 patch_notes.example.json）")
         p.add_argument("--games", type=int, default=3)
-    for name in ("stats", "calibrate", "report"):
+    for name in ("stats", "calibrate", "report", "rezone"):
         p = sub.add_parser(name)
         p.add_argument("--out", required=True)
         p.add_argument("--strategy", default=None)
@@ -171,6 +192,8 @@ def main(argv=None):
         cmd_calibrate(args)
     elif args.cmd == "report":
         cmd_report(args)
+    elif args.cmd == "rezone":
+        cmd_rezone(args)
     elif args.cmd == "all":
         cmd_parse(args)
         cmd_calibrate(args)

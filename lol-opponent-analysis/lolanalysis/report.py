@@ -135,6 +135,9 @@ class MiniMap:
                    [(0, 0), (0.30, 0), (0.30, 0.22), (0.22, 0.30), (0, 0.30)]))
         out.append('<polygon points="%s" class="zb"/>' % " ".join(P(1 - u, 1 - v) for u, v in
                    [(0, 0), (0.30, 0), (0.30, 0.22), (0.22, 0.30), (0, 0.30)]))
+        c = G.LANE_CORNER
+        out.append('<rect x="0" y="0" width="%.1f" height="%.1f" class="zb"/>' % (c * 512, c * 512))
+        out.append('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" class="zb"/>' % ((1 - c) * 512, (1 - c) * 512, c * 512, c * 512))
         r = G.RIVER_HALF_WIDTH
         for off in (-r, r):
             out.append('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" class="zl"/>' % (
@@ -487,17 +490,23 @@ def _xy_from_basis(basis):
 def _deaths(S, mm):
     D = S["deaths"]
     out = ["<h2>他的所有死亡位置（%d 场，共 %d 次）%s</h2>" % (D["n_games"], D["total"], small_badge(D["n_games"] < 10))]
+    if D.get("main_position"):
+        out.append('<p class="note">地图画出所有对局的死亡（三角 = 他打%s以外位置的对局）；右侧“前 10 分钟”的统计只用他打%s的 %d 场，'
+                   '打其它位置时死在哪里单列，避免混在一起。</p>' % (E(POS_ZH.get(D["main_position"], "")),
+                                                    E(POS_ZH.get(D["main_position"], "")), D["n_main_games"]))
     layers = []
     for r in sorted(D["rows"], key=lambda r: -r["t_min"]):
         cls = "t1" if r["t_min"] < 10 else ("t2" if r["t_min"] < 20 else "t3")
-        layers.append(dot(r["x"], r["y"], cls, "%s %s %s %s，敌方 %d 人%s" % (
-            r["match_id"], r["t"], r["champ_zh"], r["zone"], r["n_attackers"], "（处决）" if r["executed"] else ""),
-            r=6 if r["t_min"] < 10 else 4.5))
+        off = D.get("main_position") and r.get("position") != D["main_position"]
+        layers.append(dot(r["x"], r["y"], cls, "%s %s %s（%s）%s，敌方 %d 人%s" % (
+            r["match_id"], r["t"], r["champ_zh"], POS_ZH.get(r.get("position", ""), ""), r["zone"], r["n_attackers"],
+            "（处决）" if r["executed"] else ""), r=6 if r["t_min"] < 10 else 4.5, shape="tri" if off else "circle"))
     out.append('<div class="maps">')
     out.append(mm.svg(layers, "死亡位置（颜色 = 时间段）", [(legend_sym("t1"), "前 10 分钟"), (legend_sym("t2"), "10–20 分钟"),
                                                     (legend_sym("t3"), "20 分钟以后")]))
     side = ['<div class="side">']
-    side.append("<h3>前 10 分钟：死在哪里</h3>")
+    side.append("<h3>前 10 分钟：死在哪里（%s局，%d 次，其中被抓 %d 次）</h3>" % (
+        E(POS_ZH.get(D.get("main_position") or "", "全部")), D["early_total"], D.get("early_ganked", 0)))
     side.append(table(["地点", "次数"], [[td(E(z)), td(c, "num")] for z, c in D["early_zone_counts"]]) if D["early_zone_counts"]
                 else "<p>前 10 分钟没有死亡。</p>")
     side.append("<h3>前 10 分钟：什么时候死</h3>")
@@ -505,7 +514,10 @@ def _deaths(S, mm):
     if D["early_top_zone"]:
         side.append('<p class="verdict">前 10 分钟死得最多：<b>%s</b>（%d 次）；最集中的时间段：<b>%s</b>（%d 次）。</p>' % (
             E(D["early_top_zone"][0]), D["early_top_zone"][1], E(D["early_top_bin"]["bin"]), D["early_top_bin"]["deaths"]))
-    side.append("<h3>全场：死在哪里</h3>")
+    for p, zc in (D.get("other_positions_early") or {}).items():
+        side.append('<p class="note">他打%s时前 10 分钟死在：%s</p>' % (
+            E(POS_ZH.get(p, p)), E("、".join("%s %d 次" % tuple(x) for x in zc))))
+    side.append("<h3>全场：死在哪里（%s局）</h3>" % E(POS_ZH.get(D.get("main_position") or "", "全部")))
     side.append(table(["地点", "次数"], [[td(E(z)), td(c, "num")] for z, c in D["all_zone_counts"]]))
     side.append("</div>")
     out.append("".join(side))
