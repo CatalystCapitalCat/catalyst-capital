@@ -205,18 +205,25 @@ def render(summary, strategy, map_png, out_dir, calib=None, notes=None):
             E(m.get("downloaded_date", "?")), small_badge(m["n_included"] < 10)))
     if m.get("synthetic"):
         head = '<div class="synthetic">测试用合成数据，不是真实对局，不能用来做判断</div>' + head
-    nav = '<nav class="tabs" role="tablist"><div class="wrap">%s</div></nav>' % "".join(
-        '<button role="tab" id="tab-%s" aria-controls="p-%s" aria-selected="%s">%s</button>' % (
-            k, k, "true" if i == 0 else "false", E(t)) for i, (k, t, _) in enumerate(tabs))
-    panels = "".join('<section class="panel wrap" role="tabpanel" id="p-%s" aria-labelledby="tab-%s"%s>%s</section>' % (
-        k, k, "" if i == 0 else " hidden", body) for i, (k, _, body) in enumerate(tabs))
+    # 页签用单选按钮 + label + CSS 实现，不依赖 JavaScript（有些文件查看器不运行脚本）
+    radios = "".join('<input type="radio" name="tabs" class="tabr" id="r-%s" aria-label="%s"%s>' % (
+        k, E(t), " checked" if i == 0 else "") for i, (k, t, _) in enumerate(tabs))
+    nav = '<nav class="tabs"><div class="wrap">%s</div></nav>' % "".join(
+        '<label for="r-%s" id="tab-%s">%s</label>' % (k, k, E(t)) for k, t, _ in tabs)
+    panels = "".join('<section class="panel wrap" id="p-%s" aria-labelledby="tab-%s">%s</section>' % (
+        k, k, body) for k, _, body in tabs)
+    tab_css = "".join(
+        '#r-%s:checked~main #p-%s{display:flex}'
+        '#r-%s:checked~nav label[for="r-%s"]{color:var(--ink);border-bottom-color:var(--accent)}'
+        '#r-%s:focus-visible~nav label[for="r-%s"]{outline:2px solid var(--accent);outline-offset:-2px}'
+        % (k, k, k, k, k, k) for k, _, _ in tabs)
     head_part = (
         '<title>%s 对手档案</title>\n<meta name="claude:viewport-fit-sides" content="cover">\n'
         '<link rel="preconnect" href="https://fonts.googleapis.com">'
         '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&'
         'family=JetBrains+Mono:wght@400&family=Noto+Sans+SC:wght@400;500;700&display=swap">\n'
-        '<style>%s</style>\n' % (E(m.get("game_name") or "对手"), CSS))
-    body_part = '%s%s%s<main>%s</main>\n<script>%s</script>\n' % (mm.defs(), head, nav, panels, JS)
+        '<style>%s%s</style>\n' % (E(m.get("game_name") or "对手"), CSS, tab_css))
+    body_part = '%s%s%s%s<main>%s</main>\n<script>%s</script>\n' % (radios, mm.defs(), head, nav, panels, JS)
     fragment = head_part + body_part
     full = ('<!doctype html>\n<html lang="zh-CN"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
@@ -803,13 +810,14 @@ h1{font-family:var(--font-display);font-weight:600;font-size:clamp(26px,4vw,40px
 .sub{margin:0;color:var(--ink-2)}
 nav.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
 nav.tabs .wrap{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
-nav.tabs button{font:600 16px/1 var(--font-display);letter-spacing:.04em;background:none;border:0;border-bottom:3px solid transparent;
+.tabr{position:absolute;opacity:0;width:1px;height:1px;margin:0;pointer-events:none}
+.panel{display:none}
+nav.tabs label{font:600 16px/1 var(--font-display);letter-spacing:.04em;background:none;border:0;border-bottom:3px solid transparent;
   color:var(--ink-2);padding:14px 12px 11px;cursor:pointer;white-space:nowrap}
-nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
-nav.tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+nav.tabs label:hover{color:var(--ink)}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
 main{padding-block:8px 48px}
-.panel{display:flex;flex-direction:column;gap:6px}
+.panel{flex-direction:column;gap:6px}
 h2{font-family:var(--font-display);font-weight:600;font-size:23px;margin:26px 0 4px;text-wrap:balance}
 h3{font-size:16px;margin:18px 0 4px}
 p{margin:4px 0;max-width:75ch}
@@ -874,23 +882,12 @@ ul{margin:4px 0;padding-left:1.3em;max-width:85ch} li{margin:3px 0}
 """
 
 JS = r"""
+// 可选增强：地址里带 #pool 之类时直接打开那个页签；脚本不运行时页签照样能点
 (function(){
-  var tabs=[].slice.call(document.querySelectorAll('nav.tabs button'));
-  function show(key, push){
-    var hit=false;
-    tabs.forEach(function(b){var on=b.id==='tab-'+key; if(on)hit=true;
-      b.setAttribute('aria-selected',on?'true':'false');
-      document.getElementById(b.getAttribute('aria-controls')).hidden=!on;});
-    if(!hit&&tabs[0]){show(tabs[0].id.slice(4));return;}
-    if(push){try{history.replaceState(null,'','#'+key);}catch(e){}}
-  }
-  tabs.forEach(function(b){b.addEventListener('click',function(){show(b.id.slice(4),true);});});
-  document.querySelector('nav.tabs').addEventListener('keydown',function(e){
-    var i=tabs.indexOf(document.activeElement); if(i<0)return;
-    if(e.key==='ArrowRight'||e.key==='ArrowLeft'){var j=(i+(e.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;
-      tabs[j].focus(); show(tabs[j].id.slice(4),true); e.preventDefault();}
-  });
   var h=(location.hash||'').replace('#','');
-  if(/^[a-z]+$/.test(h))show(h,false);
+  var r=/^[a-z]+$/.test(h)&&document.getElementById('r-'+h);
+  if(r){r.checked=true;}
+  document.querySelectorAll('.tabr').forEach(function(x){x.addEventListener('change',function(){
+    try{history.replaceState(null,'','#'+x.id.slice(2));}catch(e){}});});
 })();
 """
