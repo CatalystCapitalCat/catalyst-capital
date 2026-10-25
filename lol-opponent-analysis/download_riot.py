@@ -199,9 +199,18 @@ class Client:
                     time.sleep(wait + 0.5)
                     continue
                 if riot and status in (401, 403):
+                    # 拳头返回的说明（例如 "Unknown apikey"），里面不含密钥
+                    try:
+                        msg = json.loads(detail).get("status", {}).get("message") or detail.strip()
+                    except (ValueError, AttributeError):
+                        msg = detail.strip()
                     raise FatalAPIError(
-                        "HTTP %d：密钥无效、已过期或没有权限。开发者密钥每 24 小时过期，"
-                        "请到 https://developer.riotgames.com 重新生成后再运行。" % status)
+                        "HTTP %d（拳头返回：%s）：密钥无效、已过期或没有权限。\n"
+                        "  1. 到 https://developer.riotgames.com 点 “REGENERATE API KEY” 生成新密钥"
+                        "（页面上显示的旧密钥可能已经过期，要点按钮重新生成）；\n"
+                        "  2. 新密钥生成后最多要等 5 分钟才生效；\n"
+                        "  3. 复制完整的密钥（RGAPI- 开头，共 42 个字符），重新 export 后再运行。"
+                        % (status, msg[:80] or "无说明"))
                 if status >= 500 and net_retries < 4:
                     net_retries += 1
                     wait = 2 ** net_retries
@@ -343,6 +352,10 @@ def main(argv=None):
     if not api_key:
         print("环境变量 RIOT_API_KEY 的格式不对（含空格、换行或非英文字符）。请重新复制 RGAPI- 开头的密钥再设置一次。")
         return 2
+    if not re.fullmatch(r"RGAPI-[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}", api_key):
+        # 只报告格式和长度，不显示密钥本身
+        print("提示：密钥格式看起来不像开发者密钥（应为 RGAPI- 加 36 位，共 42 个字符；现在是 %d 个字符%s）。"
+              "如果下面报 401/403，请重新完整复制。" % (len(api_key), "，开头不是 RGAPI-" if not api_key.startswith("RGAPI-") else ""))
 
     game_name, tag_line = split_riot_id(args.riot_id)
     count = max(1, min(95, args.count))
