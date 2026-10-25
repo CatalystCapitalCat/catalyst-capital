@@ -277,8 +277,11 @@ def _overview(S, st):
                  td(num(a2["avg_deaths"]), "num")])
     out.append("<h2>会不会上头%s</h2>" % small_badge(t["small"]))
     out.append(table(["范围", "前一场", "下一场数", "下一场胜率", "下一场场均死亡"], rows))
-    out.append('<p class="verdict">%s。全部对局场均死亡 %s。<span class="note">规则：%s</span></p>' % (
-        E(t["verdict"]), num(t["overall_avg_deaths"]), E(t["rule"])))
+    sb = t.get("session_breaks") or {}
+    out.append('<p class="verdict">%s。全部对局场均死亡 %s。%s<span class="note">规则：%s</span></p>' % (
+        E(t["verdict"]), num(t["overall_avg_deaths"]),
+        ("两场间隔超过 1 小时（一次连续排位结束）共 %d 次：%d 次是输了之后停的，%d 次是赢了之后停的。" % (
+            sb["n"], sb["after_loss"], sb["after_win"])) if sb.get("n") else "", E(t["rule"])))
     out.append(src_note(t["src"]))
 
     du = S["duo"]
@@ -291,6 +294,14 @@ def _overview(S, st):
                            td(E("、".join("%s %d" % kv for kv in x["champs"].items())))] for x in du["rows"]]))
     else:
         out.append("<p>没有在 3 场以上同队出现的队友（数据显示他基本单排）。</p>")
+    if du.get("sequence"):
+        seq = du["sequence"]
+        out.append('<p class="verdict">按时间顺序，%d / %d 场有常见队友同队；没有常见队友的 %d 场里，位置是：%s。'
+                   '<span class="note">顺序（旧→新）：%s</span></p>' % (
+                       du["games_with_regular"], len(seq), len(seq) - du["games_with_regular"],
+                       E("、".join("%s %d 场" % (POS_ZH.get(k, k), v) for k, v in du["solo_positions"].items()) or "无"),
+                       E(" → ".join((x["with"].split("#")[0] if x["with"] else "单排") + ("（%s）" % POS_ZH.get(x["position"], "") if x["position"] != "JUNGLE" else "")
+                                    for x in seq))))
     out.append('<p class="note">%s</p>' % E(du["rule"]) + src_note(du["src"]))
 
     out.append("<h2>逐场记录</h2>")
@@ -343,7 +354,9 @@ def _lane_jungle(S, mm):
     rows = []
     for pos, r in L["by_position"].items():
         rows.append([td(E(POS_ZH.get(pos, pos))), td(r["n"], "num") if not r["small"] else td("%d%s" % (r["n"], small_badge(True)), "num")]
-                    + [cell(num(r[k]["mean"], 0 if "gold" in k or "xp" in k else 1, sign=True), r[k]["rating"])
+                    + [cell("%s <span class='mk'>中位 %s</span>" % (
+                        num(r[k]["mean"], 0 if "gold" in k or "xp" in k else 1, sign=True),
+                        num(r[k]["median"], 0 if "gold" in k or "xp" in k else 1, sign=True)), r[k]["rating"])
                        for k in ("gold_diff_10", "xp_diff_10", "cs_diff_10", "gold_diff_15", "xp_diff_15", "cs_diff_15")]
                     + [td(pct(r["gold_diff_15"]["ahead_share"]), "num"),
                        cell(num(r["first_item"]["median"]) + " 分", r["first_item"]["rating"])])
@@ -352,6 +365,11 @@ def _lane_jungle(S, mm):
                '首件成装：第一件“成装”购买的时间（已扣掉撤销的购买），颜色与对位的首件成装时间比。</p>')
     out.append(table(["位置", "场次", "10 分经济差", "10 分经验差", "10 分补刀差", "15 分经济差", "15 分经验差", "15 分补刀差",
                       "15 分领先局占比", "首件成装（中位）"], rows))
+    for pos, r in L["by_position"].items():
+        g10 = r["gold_diff_10"]
+        if g10.get("n"):
+            out.append('<p class="note">%s：10 分钟经济落后对位 %d / %d 场（平均值 %s，中位数 %s；平均值容易被一两场大优势或大劣势拉偏）。</p>' % (
+                E(POS_ZH.get(pos, pos)), g10.get("behind_n", 0), g10["n"], num(g10["mean"], 0, sign=True), num(g10["median"], 0, sign=True)))
     fi_items = []
     for pos, r in L["by_position"].items():
         if r["first_item"]["items"]:
@@ -365,7 +383,7 @@ def _lane_jungle(S, mm):
 
     es = L["early_summary"]
     out.append("<h2>前 10 分钟的击杀和死亡%s</h2>" % small_badge(es["games"] < 10))
-    out.append('<p class="verdict">%d 场里：击杀 %d、助攻 %d、死亡 %d（其中被抓 %d、单挑被杀 %d、被塔/兵处决 %d），场均死亡 %s。'
+    out.append('<p class="verdict">%d 场（所有位置）里：击杀 %d、助攻 %d、死亡 %d（其中被抓 %d、被 1 个人击杀 %d、被塔/兵处决 %d），场均死亡 %s。'
                '<span class="note">%s</span></p>' % (
                    es["games"], es["kills"], es["assists"], es["deaths"], es["ganked_deaths"], es["solo_deaths"],
                    es["executed"], num(es["deaths_per_game"], 2), E(es["rule"])))
@@ -427,11 +445,14 @@ def _jungle_section(J, mm):
                 continue
             if e["result"].startswith("抓到"):
                 glayers.append(dot(xy[0], xy[1], "ok", "%s %s %s %s" % (gk["match_id"], e["t_label"], G.ZONE_NAMES[e["lane"]], e["result"])))
+            elif e["result"].startswith("在线附近"):
+                glayers.append(dot(xy[0], xy[1], "s0", "%s %s %s %s" % (gk["match_id"], e["t_label"], G.ZONE_NAMES[e["lane"]], e["result"])))
             elif e["result"] == "他阵亡":
                 glayers.append(dot(xy[0], xy[1], "dead", "%s %s %s 他阵亡" % (gk["match_id"], e["t_label"], G.ZONE_NAMES[e["lane"]]), shape="x"))
             else:
                 glayers.append(dot(xy[0], xy[1], "maybe", "%s %s %s 没有击杀（推测）" % (gk["match_id"], e["t_label"], G.ZONE_NAMES[e["lane"]]), shape="tri"))
-    out.append(mm.svg(glayers, "前 10 分钟去线上的位置", [(legend_sym("ok"), "抓到了（击杀/助攻）"),
+    out.append(mm.svg(glayers, "前 10 分钟去线上的位置", [(legend_sym("ok"), "抓到了（杀了这条线的对手）"),
+                                                    (legend_sym("s0"), "在线附近杀了对面打野/游走的人"),
                                                     (legend_sym("dead", "x"), "他阵亡"),
                                                     (legend_sym("maybe", "tri"), "整分钟位置在线上、没有击杀（推测）")]))
     out.append("</div>")
@@ -451,11 +472,12 @@ def _jungle_section(J, mm):
     inv = J["invade"]
     out.append("<h2>进对面野区%s%s</h2>" % (inferred_badge(), small_badge(J["small"])))
     out.append('<p class="verdict">%d / %d 场在前 10 分钟有整分钟位置落在对面野区；场均 %s 个整分钟点（对面打野进他野区：场均 %s）。'
-               '全场场均吃对面野怪 %s（对局详情 totalEnemyJungleMinionsKilled）；场均河蟹 %s。<span class="note">%s</span></p>' % (
+               '全场场均击杀对面野怪 %s 个（对局详情 totalEnemyJungleMinionsKilled，按野怪单位计，不是营地数）；场均河蟹 %s。<span class="note">%s</span></p>' % (
                    inv["games_with_invade_pre10"], inv["n"], num(inv["avg_minutes_pre10"]), num(inv["opp_avg_minutes_pre10"]),
                    num(inv["avg_enemy_jg_cs_game"]), num(inv["avg_scuttle"]), E(inv["basis"])))
     O = J["objectives"]
     out.append("<h2>野区资源%s</h2>" % small_badge(J["small"]))
+    out.append('<p class="note">虚空巢虫按单只计（每场 3 只）；“他方首次拿（中位）”只算他方拿到过的场次。</p>')
     out.append(table(["资源", "他方拿 / 总数", "他方占比", "他方拿时他参与", "他方首次拿（中位）", "全场首次被拿（中位）", "他方拿到过的场次"],
                      [[td(E(o["label"])), td("%d / %d" % (o["his_team"], o["total"]), "num"), td(pct(o["his_team_share"]), "num"),
                        td(pct(o["him_involved_of_team"]), "num"), td(mmss(o["first_take_median_min"]), "num"),
@@ -502,8 +524,10 @@ def _deaths(S, mm):
             r["match_id"], r["t"], r["champ_zh"], POS_ZH.get(r.get("position", ""), ""), r["zone"], r["n_attackers"],
             "（处决）" if r["executed"] else ""), r=6 if r["t_min"] < 10 else 4.5, shape="tri" if off else "circle"))
     out.append('<div class="maps">')
-    out.append(mm.svg(layers, "死亡位置（颜色 = 时间段）", [(legend_sym("t1"), "前 10 分钟"), (legend_sym("t2"), "10–20 分钟"),
-                                                    (legend_sym("t3"), "20 分钟以后")]))
+    legend = [(legend_sym("t1"), "前 10 分钟"), (legend_sym("t2"), "10–20 分钟"), (legend_sym("t3"), "20 分钟以后")]
+    if D.get("other_positions_early") is not None and any(r.get("position") != D.get("main_position") for r in D["rows"]):
+        legend.append((legend_sym("t3", "tri"), "三角 = 他打%s以外的位置" % POS_ZH.get(D.get("main_position") or "", "")))
+    out.append(mm.svg(layers, "死亡位置（颜色 = 时间段）", legend))
     side = ['<div class="side">']
     side.append("<h3>前 10 分钟：死在哪里（%s局，%d 次，其中被抓 %d 次）</h3>" % (
         E(POS_ZH.get(D.get("main_position") or "", "全部")), D["early_total"], D.get("early_ganked", 0)))
@@ -635,6 +659,8 @@ def _ref_section(S, notes):
         champs = set()
         if ref:
             champs = {c["champ"] for c in ref["his"] + ref["mine"]} | {c["name_zh"] for c in ref["his"] + ref["mine"]}
+        for d in (S.get("duo") or {}).get("rows", []):  # 他双排队友常用的英雄（可能就是你的对线对手）
+            champs |= set(d.get("champs", {}).keys())
         rows = []
         for n in notes.get("items", []):
             subj = n.get("subject", "")

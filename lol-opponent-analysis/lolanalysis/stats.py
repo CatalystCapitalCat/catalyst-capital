@@ -132,7 +132,7 @@ def compute(out_dir, ds_meta, log=print):
     S["duo"] = _duo(games, parts, src)
     S["lane"] = _lane(games, tl_games, kills, src)
     jg = [g for g in tl_games if g["position"] == "JUNGLE"]
-    S["jungle"] = _jungle(jg, frames, kills, objs, src) if jg else None
+    S["jungle"] = _jungle(jg, frames, kills, objs, src, parts) if jg else None
     S["deaths"] = _deaths(tl_games, kills, src, main_pos)
     S["weakness"] = _weakness(games, tl_games, kills, frames, parts, src)
     S["ban"] = _ban(S["champ_pool"], src)
@@ -340,6 +340,7 @@ def _tilt(games, src):
         out["label"] = label
         return out
 
+    breaks = [p for p in pairs if p["gap_min"] > 60]
     allp = block(pairs, "所有相邻两场")
     sess = block([p for p in pairs if p["gap_min"] <= 60], "间隔 ≤ 60 分钟（同一次连续排位）")
     # 连败后的表现
@@ -360,6 +361,8 @@ def _tilt(games, src):
             "after_2_losses": {"n": len(streak), "wr": pct(sum(g["win"] for g in streak), len(streak)),
                                "avg_deaths": mean(g["deaths"] for g in streak)},
             "overall_avg_deaths": mean(g["deaths"] for g in gs), "verdict": verdict,
+            "session_breaks": {"n": len(breaks), "after_loss": sum(1 for p in breaks if p["prev_win"] == 0),
+                               "after_win": sum(1 for p in breaks if p["prev_win"] == 1)},
             "small": min(al["n"], aw["n"]) < SMALL_N,
             "rule": "按开局时间排序，看每场的下一场（只含数据里的单双排，中间打的其它模式看不到）；"
                     "输后胜率比赢后低 ≥15 个百分点且场均死亡多 ≥1 次，判为容易上头",
@@ -385,7 +388,16 @@ def _duo(games, parts, src):
                          "wr_without": pct(sum(g["win"] for g in others), len(others)),
                          "n_without": len(others), "small": len(ps) < SMALL_N})
     rows.sort(key=lambda r: -r["games"])
-    return {"rows": rows, "rule": "他的队友中，在纳入统计的对局里出现 ≥3 次的玩家", "src": src(games)}
+    # 按时间顺序：每场和哪位常见队友一起（判断是不是固定双排）
+    seq = []
+    for g in sorted(games, key=lambda g: g["game_start_utc"]):
+        who = [r["riot_id"] for r in rows if g["match_id"] in r["match_ids"]]
+        seq.append({"match_id": g["match_id"], "start": g["game_start_utc"], "position": g["position"],
+                    "win": g["win"], "with": who[0] if who else ""})
+    solo_pos = Counter(x["position"] for x in seq if not x["with"])
+    return {"rows": rows, "sequence": seq, "games_with_regular": sum(1 for x in seq if x["with"]),
+            "solo_positions": dict(solo_pos),
+            "rule": "他的队友中，在纳入统计的对局里出现 ≥3 次的玩家；按时间顺序看每场和谁一起", "src": src(games)}
 
 
 def _lane(games, tl_games, kills, src):
@@ -398,6 +410,7 @@ def _lane(games, tl_games, kills, src):
             xs = [g[key] for g in gs if g.get(key) is not None]
             row[key] = {"mean": mean(xs), "median": median(xs), "n": len(xs),
                         "ahead_share": pct(sum(1 for x in xs if x > 0), len(xs)),
+                        "behind_n": sum(1 for x in xs if x < 0),
                         "rating": rate(mean(xs), 0, True, band=DIFF_BANDS.get(key, 1000), absolute=True,
                                        n_base=len(xs)) if xs else "grey"}
         fp = _first_item_pair(gs)
@@ -436,7 +449,13 @@ def _lane(games, tl_games, kills, src):
 
 
 # ---------------------------------------------------------------- 打野
-def _jungle(jg, frames, kills, objs, src):
+LANE_ROLE = {"TOP": ("TOP",), "MID": ("MIDDLE",), "BOT": ("BOTTOM", "UTILITY")}
+GANK_OK = "抓到了（击杀/助攻这条线的对手）"
+OTHER_KILL = "在线附近打赢了对面打野或游走的人（不算抓人）"
+
+
+def _jungle(jg, frames, kills, objs, src, parts=()):
+    pos_of = {(p["match_id"], p["pid"]): p["position"] for p in parts}
     fr_by = defaultdict(dict)
     opp_fr = defaultdict(dict)
     for f in frames:
@@ -456,7 +475,7 @@ def _jungle(jg, frames, kills, objs, src):
         mid, team = g["match_id"], g["team_id"]
         fr = fr_by.get(mid, {})
         openings.append(_opening(g, fr))
-        eps = _gank_episodes(g, fr, k_by.get(mid, []))
+        eps = _gank_episodes(g, fr, k_by.get(mid, []), pos_of)
         ganks_all.append({"match_id": mid, "champ_zh": g["champ_zh"], "side": g["side"], "win": g["win"],
                           "episodes": eps})
         invade_rows.append(_invade(g, fr, opp_fr.get(mid, {}), k_by.get(mid, [])))
@@ -495,7 +514,7 @@ def _jungle(jg, frames, kills, objs, src):
         for e in gk["episodes"]:
             if e["t_min"] < 10 and e["lane"] in ("TOP", "MID", "BOT"):
                 pre10[e["lane"]] += 1
-                if e["result"] == "抓到了（有击杀/助攻）":
+                if e["result"] == GANK_OK:
                     pre10_success[e["lane"]] += 1
                 if not e["inferred"]:
                     pre10_direct[e["lane"]] += 1
@@ -518,7 +537,7 @@ def _jungle(jg, frames, kills, objs, src):
         "openings": openings, "patterns": patterns, "starts": starts,
         "first_gank": first, "first_gank_lanes": fg_lane.most_common(),
         "first_gank_median": median(f["t_min"] for f in fg_ok),
-        "first_gank_success": pct(sum(1 for f in fg_ok if f["result"] == "抓到了（有击杀/助攻）"), len(fg_ok)),
+        "first_gank_success": pct(sum(1 for f in fg_ok if f["result"] == GANK_OK), len(fg_ok)),
         "lanes_pre10": lanes, "ganks": ganks_all, "invade": _invade_summary(invade_rows),
         "objectives": objectives, "half_preference": half,
         "cs_per_camp_assumption": CS_PER_CAMP,
@@ -602,7 +621,7 @@ def _opening(g, fr):
             "basis": "；".join(basis), "inferred": True}
 
 
-def _gank_episodes(g, fr, ks):
+def _gank_episodes(g, fr, ks, pos_of=None):
     """他每次去线上的经历。
     直接数据：击杀事件（他是击杀/助攻/阵亡者）发生在线上或河道口；同一路 60 秒内的多个事件算一次。
     推测：第 3–13 分钟整分钟位置在线上/河道口（2:00 的位置不算：真实数据里 2:00 常见打野清完一边、
@@ -616,23 +635,29 @@ def _gank_episodes(g, fr, ks):
         lane = G.gank_lane(k["x"], k["y"])
         if lane is None:
             continue
+        victim_pos = (pos_of or {}).get((k["match_id"], k["victim_pid"]), "")
         if k["him_role"] in ("K", "A") and k["victim_team"] != team:
-            result = "抓到了（有击杀/助攻）"
+            # 只有杀了这条线上的对手才算抓人成功；杀对面打野/游走的人单独记
+            result = GANK_OK if (not pos_of or victim_pos in LANE_ROLE[lane]) else OTHER_KILL
         elif k["him_role"] == "V":
             result = "他阵亡"
         else:
             continue
         evs.append({"t_min": k["t_min"], "t_label": mmss(k["t_min"]), "lane": lane, "result": result,
-                    "inferred": False, "basis": "击杀事件 %s，坐标(%d,%d)，%s" % (mmss(k["t_min"]), k["x"], k["y"],
-                                                                         G.ZONE_NAMES.get(k["zone"], k["zone"]))})
+                    "inferred": False, "victim": k["victim_champ"], "victim_pos": victim_pos,
+                    "basis": "击杀事件 %s，坐标(%d,%d)，%s；%s %s（%s）" % (
+                        mmss(k["t_min"]), k["x"], k["y"], G.ZONE_NAMES.get(k["zone"], k["zone"]),
+                        "他阵亡，击杀者" if k["him_role"] == "V" else "被杀的是", k["killer_champ"] if k["him_role"] == "V"
+                        else k["victim_champ"], victim_pos or "?")})
     evs.sort(key=lambda e: e["t_min"])
     merged = []
     for e in evs:
         last = merged[-1] if merged else None
         if last and last["lane"] == e["lane"] and e["t_min"] - last["_end"] <= 1.0:
             last["_end"] = e["t_min"]
-            if e["result"].startswith("抓到"):
-                last["result"] = e["result"]  # 只要有一次击杀/助攻就算抓到了
+            rank = {GANK_OK: 3, OTHER_KILL: 2}
+            if rank.get(e["result"], 0) > rank.get(last["result"], 0):
+                last["result"] = e["result"]  # 同一次里只要杀到这条线的对手就算抓到了
             continue
         e["_end"] = e["t_min"]
         merged.append(e)
@@ -911,7 +936,7 @@ def _ban(pool, src):
             "src": pool["src"]}
 
 
-def _ref(C, pool, my_pool, main_games, top_n=4):
+def _ref(C, pool, my_pool, main_games, top_n=5):
     """Data Dragon 当前版本的技能数据：他最常用的几个英雄 + 我的英雄池。"""
     path = os.path.join(C, "champion_spells.csv")
     if not os.path.exists(path):
